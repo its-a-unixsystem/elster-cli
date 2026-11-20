@@ -1,0 +1,7 @@
+# ELSTER interface downloads and test certificates: publicly downloadable from download.elster.de, but not licensed for redistribution
+docs/API/
+
+# Local agent configuration and installed skills
+.claude/
+.agents/
+skills-lock.json
