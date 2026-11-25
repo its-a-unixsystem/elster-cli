@@ -31,7 +31,7 @@ Sources: [Go or Rust](issues/08-language.md), [ERiC for the Kontoabfrage](issues
 1. **Rust**, edition 2024, stable toolchain pinned in `rust-toolchain.toml`, single crate, target `x86_64-unknown-linux-gnu` (not musl: a static musl binary cannot `dlopen` ERiC's glibc libraries).
 2. **All ELSTER traffic goes through ERiC** (`libericapi`); Objektspeicher objects through Otto (`libotto`, same package). No self-built transport, no fallback, no Postfach-only mode.
 3. **Own runtime binding** with `libloading`: hand-written `extern "C"` function-pointer types and `#[repr(C)]` copies of `eric_druck_parameter_t` and `eric_verschluesselungs_parameter_t`. Nothing derived from ELSTER headers is committed; no build-time dependency on the ERiC package, so the binary starts without ERiC. Functions in use (haben's set plus certificate inspection and Steuernummer conversion):
-   - ERiC: `EricInitialisiere`, `EricBeende`, `EricVersion`, `EricBearbeiteVorgang` (ERiC ≥ 44 signature, no transfer handle), `EricGetHandleToCertificate`, `EricCloseHandleToCertificate`, `EricHoleZertifikatEigenschaften`, `EricMakeElsterStnr`, `EricHoleFehlerText`, `EricRueckgabepufferErzeugen`, `EricRueckgabepufferInhalt`, `EricRueckgabepufferFreigeben`, and `EricDekodiereDaten` ⏳ (only if Otto returns encrypted data).
+   - ERiC: `EricInitialisiere`, `EricBeende`, `EricVersion`, `EricBearbeiteVorgang` (ERiC ≥ 44 signature, no transfer handle), `EricGetHandleToCertificate`, `EricCloseHandleToCertificate`, `EricHoleZertifikatEigenschaften`, `EricMakeElsterStnr`, `EricHoleFehlerText`, `EricRueckgabepufferErzeugen`, `EricRueckgabepufferInhalt`, `EricRueckgabepufferFreigeben`. `EricDekodiereDaten` is not needed: Otto returns plaintext.
    - Otto: `OttoInstanzErzeugen`, `OttoInstanzFreigeben`, `OttoDatenAbholen`, `OttoHoleFehlertext`, `OttoRueckgabepufferErzeugen`, `OttoRueckgabepufferInhalt`, `OttoRueckgabepufferGroesse`, `OttoRueckgabepufferFreigeben`.
 4. **One `eric` module** owns all `unsafe` and gives every handle (Rückgabepuffer, certificate handle, `OttoInstanz`, Otto buffer) a `Drop`. Commands see it only through a trait at ERiC-call level ([Testing strategy](issues/15-testing-strategy.md) item 1):
    - `bearbeite_vorgang(xml, flags) -> raw response XML`
@@ -83,7 +83,7 @@ Precedence: flag > environment (`KIECLI_` + upper-cased key) > config file > bui
 | Config file | `--config` | `KIECLI_CONFIG` | | |
 
 - Flag-only: `--format`, `-v`, `--eric-log`.
-- Live by default; `test` puts the Testmerker on every request. The Testmerker values differ by procedure: Kontoabfrage `230000001`, Postfach `700000001` ⏳ (confirm which Postfach Testmerker the test system expects through ERiC).
+- Live by default; `test` puts the Testmerker on every request. The Testmerker values differ by procedure: Kontoabfrage `230000001`, Postfach `700000001` (the only Postfach Testmerker admitted through ERiC; `700000004` is refused with `601015001`).
 - The HerstellerID is validated as five digits; it is never in code or the repository.
 
 ### PIN
@@ -150,11 +150,11 @@ kiecli skill
 
 ### 5.1 Postfach
 
-**Bereitstellungsdatenart selection.** A built-in list of every name in SSb table 9.4 goes into one PostfachAnfrage, and `--datenart` narrows it. Names are case-sensitive; an unknown name is exit 2 (`datenart_unknown`, with a did-you-mean `help` and a corrected `suggestion`). ⏳ If the test system rejects kinds the account never receives, `anfrage` sends a PostfachStatus first and asks only for kinds with hits.
+**Bereitstellungsdatenart selection.** A built-in list of the 49 names ELSTER accepts through ERiC for version 32 goes into one PostfachAnfrage, and `--datenart` narrows it. The list is SSb table 9.4 minus the 34 names the server refuses, plus 11 DIVA kinds from SSb 9.2/9.3; the spike ticket holds both lists. One refused name fails the whole request, so the list is never taken from the SSb unchecked. Names are case-sensitive; an unknown name is exit 2 (`datenart_unknown`, with a did-you-mean `help` and a corrected `suggestion`).
 
-**Defaults:** `--neue`. All pages are fetched internally (`paginierungLetzteBestId`, up to 10,000 per page) and merged; no cursor is exposed. `--von` and `--bis` are ISO dates.
+**Defaults:** `--neue`. All pages are fetched internally (`paginierungLetzteBestId`, up to 10,000 per page) and merged; no cursor is exposed. `--von` and `--bis` are ISO dates. ELSTER refuses a request matching more than 500,000 entries (`190017608`); this is exit 5 with a `help` suggesting `--von` or `--datenart`.
 
-**`postfach status`:** PostfachStatus, the hit count per Bereitstellungsdatenart without Abholung.
+**`postfach status`:** PostfachStatus, the hit count per Bereitstellungsdatenart without Abholung. ELSTER's counts are incomplete (on the test system it left out a kind the Anfrage returned 71 times), so `--help`, `describe` and `SKILL.md` call it a hint; `anfrage` never depends on it.
 
 **`postfach anfrage`:** PostfachAnfrage, the metadata only. It never creates the Bestätigung obligation.
 
@@ -163,13 +163,13 @@ kiecli skill
 1. Runs its own PostfachAnfrage to resolve object IDs, sizes and names, so the caller passes only ids or `--neue`.
 2. Requires exactly one of `--bestaetigen` or `--ohne-bestaetigung`; with neither it is exit 2. Nothing is confirmed implicitly, and nothing is fetched until the caller has decided.
 3. `--out DIR` is mandatory; no content goes to stdout. Files are laid out as in §7.
-4. Fetches every object of each Postfach-Nachricht through Otto ⏳ (whether Otto returns plain, encrypted or gzipped data, and whether `EricDekodiereDaten` is needed; how Abholung works on the test system, which has no documented Objektspeicher host).
+4. Fetches every object of each Postfach-Nachricht through Otto (`OttoDatenAbholen` with the Anfrage's `ReferenzId` and `Groesse`). Otto returns the plaintext object, already decrypted and decompressed, so it is written as is. The Anfrage's `Groesse` is the transport size, not the file size (1372 announced, 626 delivered on the test system). Otto has no Testmerker parameter: the Objektspeicher tells test from live by the Certificate, so the test system needs nothing extra.
 5. `--bestaetigen` confirms only Nachrichten whose every file was written and fsynced; the others are reported unconfirmed.
 6. `--ohne-bestaetigung` gives each Nachricht `bestaetigung_faellig_bis` (Abholung time + 24 h, RFC 3339 UTC) and warning `bestaetigung_pending`. The caller confirms later with `postfach bestaetigung`.
 7. A **partial Abholung** (some objects fetched, one failed) counts as started: the Nachricht's status is `teilweise`, it is not confirmed, it carries `bestaetigung_faellig_bis`, and the run exits 7.
-8. ⏳ Whether `--neue` still lists a Nachricht that was fetched but not confirmed (state 20 ABGEHOLT), and whether a Nachricht stays listed and fetchable after Bestätigung.
+8. `--neue` lists a Nachricht until it is confirmed: an Abholung alone does not remove it (state 20 ABGEHOLT still counts as new). After Bestätigung it leaves `--neue`, stays in `alle` and can still be fetched, byte for byte the same, until its `verfuegbarbis`. So an Abholung that crashed before its Bestätigung shows up again under `--neue`.
 
-**`postfach bestaetigung`:** PostfachBestaetigung, with ids sent in blocks of 100.
+**`postfach bestaetigung`:** PostfachBestaetigung, with ids sent in blocks of 100. ELSTER answers per id, and the result is read per id even when ERiC reports an error: a block with any failing id comes back as ERiC `610101292` with ELSTER `190017112`, yet its valid ids are confirmed. An unknown id is `190015302` ("Keine Daten vorhanden"). Confirming an already confirmed id succeeds again. Some ids failing means exit 7 with per-id results; all failing means exit 5.
 
 ### 5.2 Kontoabfrage
 
@@ -274,7 +274,7 @@ Each entry is an object `{"code", "message", "help"?}`, mirroring the error obje
 - **`zertifikat status`:**
   - Top level: `gueltig_ab`, `gueltig_bis` (the earlier of the two blocks), `tage_verbleibend`, `abgelaufen`, `testzertifikat`, `registrierertyp`, `organisationszertifikat` (`Registrierertyp == Organisation`), `token_typ`, `konto_id` (the subject CN).
   - `verschluesselungszertifikat` and `signaturzertifikat` (null when ERiC omits it), each with `gueltig_ab`, `gueltig_bis`, `signaturalgorithmus`, `schluessellaenge`, `public_key_sha1`, `issuer` and `subjekt` (name/value lists), `identifikationsmerkmaltyp`, `verifikationsart`.
-  - ERiC's UTCTime is converted to RFC 3339 UTC. The MD5 fingerprint is not reported.
+  - ERiC's dates (GeneralizedTime `YYYYMMDDhhmmssZ` in ERiC 44; 12-digit UTCTime also accepted) are converted to RFC 3339 UTC. The MD5 fingerprint is not reported.
 - **`eric install`:** the installed version and directory, and links to `lizenz.pdf` and the data-protection notice.
 - **`eric status`, `config show`:** as in §5.4 and §5.5.
 
@@ -289,7 +289,7 @@ Source: [Agent interface](issues/09-agent-interface.md).
 
 - `NN` is the Anhang position, because ELSTER file names are not unique.
 - Each file is written to a temp file in the same directory, fsynced, then renamed; existing files are replaced.
-- The Datenpaket is written byte for byte as delivered (ISO-8859-15 or UTF-8), and its `encoding` is reported in JSON.
+- The Datenpaket is written byte for byte as Otto delivers it (plaintext, ISO-8859-15 or UTF-8), and its `encoding` is reported in JSON. Reported sizes are the bytes written, not the Anfrage's `Groesse`.
 - No metadata file is written to disk.
 
 ## 8. Errors and exit codes
@@ -330,6 +330,7 @@ Every command that opens the Certificate calls `EricHoleZertifikatEigenschaften`
 
 | Condition | Code | Exit |
 |---|---|---|
+| Certificate path missing or not a readable file (checked before ERiC, which would return 610201105) | `certificate_not_found` | 3 |
 | `ERIC_CRYPT_E_PIN_WRONG` (610201106) | `pin_wrong` | 3 |
 | `ERIC_CRYPT_E_PIN_LOCKED` (610201107) | `pin_locked` | 3 |
 | other `ERIC_CRYPT_*` (610201101–610201212) | `certificate_unreadable` | 3 |
@@ -355,6 +356,7 @@ For `230077012`, `notes` explain that the Kontoabfrage presupposes an authorisat
 
 - Missing settings, PIN channel failures and unreadable config: exit 3 (§4).
 - A missing ERiC, an unsupported version, terms not accepted, or a missing `libgcc_s.so.1`: exit 4 (§3).
+- **ELSTER rejections arrive as ERiC `610101210`** ("Fehler im Transferheader"), with ELSTER's own code in the server answer's TransferHeader `RC` (`Rueckgabe`, and the specific code in `Stack` when the Nutzdaten fail). The mapping keys on the `RC` code, which goes into `cause` with its text. Seen so far: `190017608` (more than 500,000 entries, exit 5), `190010802` (Bereitstellungsdatenart not released, exit 5), `601015001` (Testmerker not admitted for ERiC, exit 5).
 - ⏳ The ERiC and Otto codes for a missing or blocked HerstellerID (610301202 locally for `74931`), a wrong PIN on the wire, and an OTTER 503, and the remaining ERiC/ELSTER codes of the Postfach procedures, mapped to 5 or 6.
 - **Error-code names:** codes the tickets name are used as written: `datenart_unknown`, the certificate codes in §8.1, and `test_certificate_requires_testmerker`. Codes for the other conditions in §3–§5 are named in the build, in the same style (snake_case, glossary terms in German, otherwise English), and are all listed in `describe`.
 
@@ -433,7 +435,8 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
   Never `pull_request_target`, never PR code checked out with the secret.
 - **Test-system runs** (Testmerker on every request):
   - Always: `zertifikat status`, `postfach status`, `postfach anfrage`, all three `kontoabfrage` kinds, and the live-call refusal.
-  - ⏳ `postfach abholung --bestaetigen` and `postfach bestaetigung` join only if the test Postfach is safe for them (shared by every Hersteller? does it count toward our 24 h obligation?). Never `--ohne-bestaetigung` without a Bestätigung in the same run.
+  - The test Postfach is shared by every Hersteller using the test Organisationszertifikat (over 800,000 entries, about 300 new a day), so every Postfach call passes `--von` (yesterday).
+  - `postfach abholung --bestaetigen` and `postfach bestaetigung` run on one Nachricht that is already confirmed: listed in `alle` but not in `--neue`. Other Hersteller drain the test Postfach within hours, so there is always one. Fetching and confirming it again changes nothing for anyone else, while confirming a new one would hide it from another Hersteller's `--neue`. Whether a test-system Abholung counts toward our 24 h obligation is moot, because the run always confirms. Never `--ohne-bestaetigung` without a Bestätigung in the same run.
   - ⏳ If GitHub's runners cannot reach the test system, the same command runs on the maintainer's machine before each release, and the CI triggers are dropped.
 - **Leak guard:** whenever `KIECLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `KIECLI_CERTIFICATE`, and fails on a hit.
 
@@ -494,17 +497,10 @@ Each item names where its answer lands in this spec.
 
 | Question | Lands in |
 |---|---|
-| Whether a PostfachAnfrage naming every Bereitstellungsdatenart from SSb table 9.4 is accepted; otherwise PostfachStatus first | §5.1 |
-| Whether PostfachStatus behaves as documented through ERiC | §5.1 |
-| What Otto returns (plain, encrypted, gzip); whether `EricDekodiereDaten` is needed; how Abholung works on the test system | §2.3, §5.1 |
-| Whether `--neue` lists state 20 ABGEHOLT; whether Nachrichten stay listed and fetchable after Bestätigung | §5.1 |
-| The Postfach Testmerker value through ERiC (`700000001` or another) | §4 |
 | ERiC/Otto/ELSTER codes for a missing HerstellerID, a wrong PIN, an OTTER 503 and other Postfach failures | §8.3 |
 | An `O` Kontoabfrage on the test system: accepted test Steuernummern, the response shape, `230077012` for the test Organisationszertifikat | §5.2, §6.3 |
 | How a real account clears `230077012`/`950017011` | §8.2, §11 |
-| `EricHoleZertifikatEigenschaften` on the test certificates (both blocks, `Testzertifikat`, `Registrierertyp`, CN shape) | §6.3, fixtures |
 | That a test certificate sent live is rejected | §8.1 |
-| Whether the test Postfach is shared and safe for Abholung and Bestätigung in recurring runs | §12.4 |
 | Whether GitHub runners reach the test system | §12.4 |
 
 ## 16. Sources

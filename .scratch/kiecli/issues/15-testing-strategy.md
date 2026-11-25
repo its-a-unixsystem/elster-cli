@@ -77,6 +77,8 @@ No ADR: nothing here is hard to reverse.
 
 Amended by [Distribution](16-distribution.md): `checks` also verifies a DCO `Signed-off-by` on every commit; `cargo deny`'s licence allowlist must be AGPL-3.0-compatible; the release workflow adds a zigbuild step for glibc 2.25 with an `objdump -T` guard after the `test-system` gate.
 
+Amended by [Test-system spike: ERiC end to end](11-test-system-spike.md): the test Postfach is shared by every Hersteller using the test Organisationszertifikat (over 800,000 entries), so test-system Postfach calls always pass `--von`. Abholung and Bestätigung run on one Nachricht that is already confirmed (in `alle`, not in `--neue`), which changes nothing for other Hersteller, and every run confirms what it fetched.
+
 ## Comments
 
 ### Experiment: ERiC validation and the HerstellerID (2026-11-20)

@@ -44,6 +44,7 @@ All exit 3 (configuration or credentials), `retry: false`, ERiC code in `cause`:
 
 | Condition | Code | Where |
 |---|---|---|
+| Certificate path missing or not a readable file (checked before ERiC) | `certificate_not_found` | any command opening the Certificate |
 | `ERIC_CRYPT_E_PIN_WRONG` (610201106) | `pin_wrong` | any command opening the Certificate |
 | `ERIC_CRYPT_E_PIN_LOCKED` (610201107) | `pin_locked` | same |
 | other `ERIC_CRYPT_*` (610201101–610201212) | `certificate_unreadable` | same |
@@ -55,6 +56,8 @@ ERiC has no error code for an expired Certificate, so the local check also spare
 
 Spike checks added to [Test-system spike: ERiC end to end](11-test-system-spike.md).
 
+Amended by [Test-system spike: ERiC end to end](11-test-system-spike.md): ERiC 44 returns `AusgestelltAm`/`GueltigBis` as GeneralizedTime `YYYYMMDDhhmmssZ`, not the UTCTime of the header example below; the parser takes both. A Certificate path that does not exist or is not a readable file fails locally before ERiC as `certificate_not_found` (exit 3; ERiC would report `610201105` "Ungültiger PSE Pfad").
+
 No ADR: nothing here is hard to reverse.
 
 ## Comments
@@ -62,5 +65,5 @@ No ADR: nothing here is hard to reverse.
 ### Facts from the ERiC 44.3.6.0 headers (2026-11-19)
 
 - `EricHoleZertifikatEigenschaften(hToken, pin, rueckgabeXmlPuffer)` **needs the PIN** for software certificates (`.pfx`), so inspection runs the PIN command. `EricGetPinStatus` and `EricPruefeZertifikatPin` exist as well.
-- Returned XML (schema `EricHoleZertifikatEigenschaften.xsd`, namespace `http://www.elster.de/EricXML/2.0/EricHoleZertifikatEigenschaften`): separate signature and encryption certificate blocks, each with `AusgestelltAm`, `GueltigBis` (UTCTime `YYMMDDhhmmssZ`), `Signaturalgorithmus`, public-key hashes and bit length, `Issuer` and `Subjekt` as name/value lists, `Identifikationsmerkmaltyp`, `Registrierertyp` (e.g. `Person`), `Verifikationsart`, `TokenTyp`, `Testzertifikat`.
+- Returned XML (schema `EricHoleZertifikatEigenschaften.xsd`, namespace `http://www.elster.de/EricXML/2.0/EricHoleZertifikatEigenschaften`): separate signature and encryption certificate blocks, each with `AusgestelltAm`, `GueltigBis` (UTCTime `YYMMDDhhmmssZ` in the header example; ERiC 44 actually returns GeneralizedTime `YYYYMMDDhhmmssZ`, see the amendment above), `Signaturalgorithmus`, public-key hashes and bit length, `Issuer` and `Subjekt` as name/value lists, `Identifikationsmerkmaltyp`, `Registrierertyp` (e.g. `Person`), `Verifikationsart`, `TokenTyp`, `Testzertifikat`.
 - Privacy: for an ELSTER software certificate the subject CN is the **ELSTER account ID**. Decide whether to show it, and never put a real one in fixtures.
