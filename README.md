@@ -16,16 +16,25 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-Implementation has started. The first command, `eric status`, checks a local ERiC installation without a Certificate or a connection to ELSTER. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+`eric install` and `eric status` are available. Neither needs a Certificate or HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
 
-On Linux x86_64 with `libgcc_s.so.1` installed, unpack the official ERiC 44 package. Read its `lizenz.pdf` and data-protection notice. If you accept the terms, record acceptance next to `lizenz.pdf` and point KIECLI at that directory:
+On Linux x86_64 with `libgcc_s.so.1` installed, review `lizenz.pdf` inside the [official ERiC package](https://download.elster.de/download/eric/eric_44/ERiC-44.3.6.0-Linux-x86_64.jar) (a ZIP archive) and the [tax administration's data-protection notice](https://www.elster.de/eportal/helpGlobal?themaGlobal=datenschutz_public#ds_steuerverw). If you accept the terms:
+
+```sh
+cargo run -- eric install --accept-eric-terms
+cargo run -- eric status
+```
+
+The installer downloads the official package, checks its pinned SHA-256 and test-loads both libraries before activating it. Successful installs update `.kiecli-eric-current` in the configured ERiC directory (default: `$XDG_DATA_HOME/kiecli/eric` or `~/.local/share/kiecli/eric`). Older versions remain under `versions/`; failed installs leave the active version alone. To select an unpinned patch in a supported major, supply both `--version` and a trusted `--sha256`.
+
+Manual setup still works: unpack the official ERiC 44 package, review its `lizenz.pdf` and data-protection notice, and record acceptance next to `lizenz.pdf` before pointing KIECLI at that directory:
 
 ```sh
 touch /path/to/Linux-x86_64/.kiecli-eric-terms-accepted
 cargo run -- eric status --eric-dir /path/to/Linux-x86_64
 ```
 
-`--format text` makes the result easier to read. `--eric-log DIR` keeps the diagnostic log; otherwise it is temporary. Use `eric install --accept-eric-terms` to install ERiC once that command ships.
+`--format text` makes the result easier to read. `--eric-log DIR` keeps the diagnostic log; otherwise it is temporary.
 
 An unusable installation exits with code 4. Stdout still contains the status checks that ran; stderr contains the error. JSON uses `null` for the version and its support status when the version could not be read.
 

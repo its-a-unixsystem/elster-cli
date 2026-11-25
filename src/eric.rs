@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
+pub(crate) mod install;
+
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")))]
 compile_error!("KIECLI v1 requires x86_64 Linux with glibc");
 
@@ -22,6 +24,8 @@ const OTTO_LIB: &str = "libotto.so";
 const PACKAGE_NAME: &str = "Linux-x86_64";
 pub(crate) const DEFAULT_DATA_DIR: &str = "kiecli/eric";
 const TERMS_MARKER: &str = ".kiecli-eric-terms-accepted";
+const ACTIVE_LINK: &str = ".kiecli-eric-current";
+const VERSIONS_DIR: &str = "versions";
 const INSTALL_HELP: &str = "Use 'kiecli eric install --accept-eric-terms' or follow the manual setup in the KIECLI README.";
 const LOG_NOTE: &str = "Use --eric-log DIR to keep ERiC diagnostics.";
 pub(crate) const SUPPORTED_MAJORS: &[u16] = &[44];
@@ -284,6 +288,41 @@ impl Probe {
             check_otto(&self.library_paths.otto)
         })?;
         timed(&mut self.trace, "EricBeende", || session.finish())
+    }
+}
+
+pub(crate) fn installed_dir(root: &Path) -> Result<Option<PathBuf>, Failure> {
+    use std::path::Component::Normal;
+
+    let pointer = root.join(ACTIVE_LINK);
+    let target = match fs::read_link(&pointer) {
+        Ok(target) => target,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(Failure::new(
+                4,
+                "eric_installation_invalid",
+                format!("Cannot read '{}': {err}", pointer.display()),
+            )
+            .help(INSTALL_HELP));
+        }
+    };
+    let mut parts = target.components();
+    if matches!(parts.next(), Some(Normal(name)) if name == VERSIONS_DIR)
+        && matches!(parts.next(), Some(Normal(_)))
+        && parts.next().is_none()
+    {
+        Ok(Some(root.join(target)))
+    } else {
+        Err(Failure::new(
+            4,
+            "eric_installation_invalid",
+            format!(
+                "'{}' does not point to a managed ERiC version",
+                pointer.display()
+            ),
+        )
+        .help(INSTALL_HELP))
     }
 }
 

@@ -13,6 +13,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, ValueEnum, error::ErrorKind};
 use serde::Serialize;
 
+use eric::install::{self, Options};
 use error::Failure;
 
 #[derive(Parser)]
@@ -47,7 +48,7 @@ enum Format {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Inspect the local ERiC installation.
+    /// Install or inspect ERiC and Otto.
     Eric {
         #[command(subcommand)]
         command: EricCommand,
@@ -58,6 +59,8 @@ enum Command {
 enum EricCommand {
     /// Test-load ERiC and Otto without contacting ELSTER.
     Status,
+    /// Download, verify and activate ERiC and Otto.
+    Install(Options),
 }
 
 #[derive(Serialize)]
@@ -74,18 +77,24 @@ struct Status<'a> {
 }
 
 fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
-    match cli.command {
+    match &cli.command {
         Command::Eric {
             command: EricCommand::Status,
         } => {
             let settings = config::resolve(cli)?;
-            let mut probe = eric::Probe::new(&settings.eric_dir, cli.verbose);
-            let outcome = probe.check(&settings.eric_dir, cli.eric_log.as_deref());
+            let (dir, lookup_error) = match eric::installed_dir(&settings.eric_dir) {
+                Ok(dir) => (dir, None),
+                Err(err) => (None, Some(err)),
+            };
+            let dir = dir.as_deref().unwrap_or(&settings.eric_dir);
+            let mut probe = eric::Probe::new(dir, cli.verbose);
+            let outcome =
+                lookup_error.map_or_else(|| probe.check(dir, cli.eric_log.as_deref()), Err);
             if outcome.as_ref().is_err_and(|err| err.exit != 4) {
                 return outcome;
             }
             let status = Status {
-                eric_dir: &settings.eric_dir,
+                eric_dir: dir,
                 probe,
                 supported_majors: eric::SUPPORTED_MAJORS,
                 test_load: outcome.is_ok(),
@@ -99,6 +108,18 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
             };
             result.map_err(|err| Failure::new(1, "output_failed", err.to_string()))?;
             outcome
+        }
+        Command::Eric {
+            command: EricCommand::Install(options),
+        } => {
+            let package = options.package()?;
+            let settings = config::resolve(cli)?;
+            let installed = install::run(package, settings, cli.eric_log.as_deref(), cli.verbose)?;
+            match cli.format {
+                Format::Json => write_json(&mut stdout, &installed),
+                Format::Text => installed.write_text(&mut stdout),
+            }
+            .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
         }
     }
 }

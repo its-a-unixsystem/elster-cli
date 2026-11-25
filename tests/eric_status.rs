@@ -42,6 +42,58 @@ fn rejects_an_unknown_flag_as_a_usage_error() {
 }
 
 #[test]
+fn install_rejects_missing_consent_and_untrusted_versions_before_downloading() {
+    let home = TempDir::new().unwrap();
+    let wrong_digest = "0".repeat(64);
+    let attempts: &[(&[&str], i32, &str)] = &[
+        (&[], 4, "eric_terms_not_accepted"),
+        (
+            &["--accept-eric-terms", "--version", "45.2.0.0"],
+            4,
+            "eric_version_unsupported",
+        ),
+        (
+            &["--accept-eric-terms", "--version", "44.3.99.0"],
+            4,
+            "eric_sha256_required",
+        ),
+        (
+            &["--accept-eric-terms", "--sha256", &wrong_digest],
+            4,
+            "eric_sha256_conflict",
+        ),
+    ];
+    for (args, exit, code) in attempts {
+        let result = cli(home.path())
+            .args(["eric", "install"])
+            .args(*args)
+            .output()
+            .unwrap();
+        error(&result, *exit, code);
+        assert!(result.stdout.is_empty(), "{result:?}");
+    }
+    assert!(!home.path().join("data").exists());
+}
+
+#[test]
+fn status_checks_the_active_managed_version_not_the_installation_root() {
+    let home = TempDir::new().unwrap();
+    let root = home.path().join("data/kiecli/eric");
+    let active = root.join("versions/44.3.6.0");
+    let lib = active.join("lib");
+    std::fs::create_dir_all(&lib).unwrap();
+    std::fs::write(lib.join("libericapi.so"), []).unwrap();
+    std::fs::write(active.join(".kiecli-eric-terms-accepted"), []).unwrap();
+    std::os::unix::fs::symlink("versions/44.3.6.0", root.join(".kiecli-eric-current")).unwrap();
+
+    let result = cli(home.path()).args(["eric", "status"]).output().unwrap();
+    error(&result, 4, "eric_load_failed");
+    let status: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(status["eric_dir"], active.display().to_string());
+    assert_eq!(status["terms_accepted"], true);
+}
+
+#[test]
 fn missing_installation_points_to_the_installer() {
     let home = TempDir::new().unwrap();
     let result = cli(home.path()).args(["eric", "status"]).output().unwrap();
@@ -71,6 +123,7 @@ fn refuses_to_load_without_terms_acceptance() {
     std::fs::create_dir(&lib).unwrap();
     // Not a shared library: a load attempt would report eric_load_failed instead.
     std::fs::write(lib.join("libericapi.so"), []).unwrap();
+    std::fs::write(home.path().join("current"), "unrelated file").unwrap();
     let result = cli(home.path())
         .args(["eric", "status", "--eric-dir", "."])
         .output()

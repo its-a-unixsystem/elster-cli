@@ -46,6 +46,12 @@ impl Failure {
         }
     }
 
+    pub(crate) fn transient(code: &'static str, message: impl Into<String>) -> Self {
+        let mut failure = Self::new(6, code, message);
+        failure.retry = true;
+        failure
+    }
+
     pub(crate) fn help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
         self
