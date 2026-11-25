@@ -1,6 +1,6 @@
 # ERiC and the Kontoabfrage
 
-Ticket: `.scratch/elster-cli/issues/03-eric-kontoabfrage.md`
+Ticket: `.scratch/kiecli/issues/03-eric-kontoabfrage.md`
 Researched: 2026-11-19. Terms follow `GLOSSARY.md` (Kontoabfrage, ERiC, Offene Schnittstelle, HerstellerID, Certificate).
 
 Source keys used below:

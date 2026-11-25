@@ -4,16 +4,16 @@ Label: wayfinder:map
 
 ## Destination
 
-An implementation-ready spec at `.scratch/bescheid-daten/spec.md` for an elster-cli v1.x addition that turns the Bescheiddaten ELSTER delivers into JSON from three sources: the BDS-2 Datenpaket of `ESB`/`USB`/`GSB`, the XUnternehmen.Gewerbesteuer XML embedded in a `Gewerbesteuerbescheid`, and the DIVA2 metadata of every Verwaltungsakt. Each is a faithful copy, plus named key figures (festgesetzte Steuer, Abrechnung, Vorauszahlungen, Bescheidkennzeichnung) where the format defines them. Building it is a separate effort after this map.
+An implementation-ready spec at `.scratch/bescheid-daten/spec.md` for a KIECLI v1.x addition that turns the Bescheiddaten ELSTER delivers into JSON from three sources: the BDS-2 Datenpaket of `ESB`/`USB`/`GSB`, the XUnternehmen.Gewerbesteuer XML embedded in a `Gewerbesteuerbescheid`, and the DIVA2 metadata of every Verwaltungsakt. Each is a faithful copy, plus named key figures (festgesetzte Steuer, Abrechnung, Vorauszahlungen, Bescheidkennzeichnung) where the format defines them. Building it is a separate effort after this map.
 
 ## Notes
 
 - **Parked (2026-11-19)** until v1 is built and [Collect real Bescheid samples](issues/03-collect-real-samples.md) has run against the real Postfach. Real samples may make parts of the current scope moot (e.g. BDS-2 if ESB/USB/GSB never arrive), and the command surface and JSON shape are easier to decide on top of v1's actual output. Resume by taking that ticket first.
 - Domain language: `GLOSSARY.md` (Verwaltungsakt, Bescheid, Bescheiddaten, Bescheidkennzeichnung, Datenpaket, Anhang, Bereitstellungsdatenart). Use its terms in tickets and the spec.
-- Builds on the [elster-cli v1 map](../elster-cli/map.md) and its decisions: Rust, everything through ERiC, stateless, JSON for agents, semver'd output. v1 writes the Datenpaket raw to disk ([Agent interface](../elster-cli/issues/09-agent-interface.md)); this effort only adds to that (a minor version), the raw file stays.
+- Builds on the [KIECLI v1 map](../kiecli/map.md) and its decisions: Rust, everything through ERiC, stateless, JSON for agents, semver'd output. v1 writes the Datenpaket raw to disk ([Agent interface](../kiecli/issues/09-agent-interface.md)); this effort only adds to that (a minor version), the raw file stays.
 - Standing decisions from charting:
-  - Faithful copy first, interpretation second: like the Kontoabfrage ([Kontoabfrage requests and responses](../elster-cli/issues/13-kontoabfrage-requests.md)), the JSON mirrors ELSTER's structure; named key figures are added only where the format defines them unambiguously.
-  - elster-cli itself produces the JSON; consumers do not parse Datenpakete. Command shape is open.
+  - Faithful copy first, interpretation second: like the Kontoabfrage ([Kontoabfrage requests and responses](../kiecli/issues/13-kontoabfrage-requests.md)), the JSON mirrors ELSTER's structure; named key figures are added only where the format defines them unambiguously.
+  - KIECLI itself produces the JSON; consumers do not parse Datenpakete. Command shape is open.
   - Scope is three sources ([Redraw the destination after the format finding](issues/04-redraw-destination.md)): BDS-2 of `ESB`/`USB`/`GSB` (and `GEWMB` if confirmed), the XUnternehmen.Gewerbesteuer XML in a `Gewerbesteuerbescheid`, and decoded DIVA2 metadata (keyed on the fields present, so every Verwaltungsakt). Other XML Anhänge are detected by namespace and reported, never converted.
   - Only data ELSTER delivers machine-readably: files embedded in a PDF count; reading the printed page (text extraction, OCR) does not.
   - The Gewerbesteuer XML is carried as delivered, marked as not the Bescheid and not compared with the PDF; a PDF without XML is an ordinary result. XUnternehmen is implemented from the public spec only: no vendored XSDs, spec text or Musterbescheide while its licence is unconfirmed; fixtures are invented.

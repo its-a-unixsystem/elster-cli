@@ -6,7 +6,7 @@ Blocked by:
 
 ## Question
 
-How does elster-cli show what Certificate it is using and warn before it expires? ELSTER certificates last about three years, and an expired one fails every call. ERiC offers `EricHoleZertifikatEigenschaften`; [Configuration and secrets](10-config-and-secrets.md) keeps `config show` from opening the Certificate, leaving this open.
+How does KIECLI show what Certificate it is using and warn before it expires? ELSTER certificates last about three years, and an expired one fails every call. ERiC offers `EricHoleZertifikatEigenschaften`; [Configuration and secrets](10-config-and-secrets.md) keeps `config show` from opening the Certificate, leaving this open.
 
 Settle:
 
@@ -24,7 +24,7 @@ Whether `EricHoleZertifikatEigenschaften` needs the PIN and which fields it retu
 
 ### `zertifikat status`
 
-1. New command `elster-cli zertifikat status`, honouring `--profile`, `--certificate` and the PIN settings like every other command. Not part of `eric status` (no Certificate there) or `config show` (no PIN command there).
+1. New command `kiecli zertifikat status`, honouring `--profile`, `--certificate` and the PIN settings like every other command. Not part of `eric status` (no Certificate there) or `config show` (no PIN command there).
 2. Local only: opens the Certificate with the PIN, calls `EricHoleZertifikatEigenschaften`, sends nothing to ELSTER, needs no HerstellerID. It doubles as the credentials preflight; `SKILL.md` names it as the first step of a session.
 3. Output, plus `test`, `profile` and `warnings` as on every command:
    - top level: `gueltig_ab`, `gueltig_bis` (the earlier of the two blocks), `tage_verbleibend`, `abgelaufen`, `testzertifikat`, `registrierertyp`, `organisationszertifikat` (`Registrierertyp == Organisation`), `token_typ`, `konto_id`;

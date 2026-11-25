@@ -1,6 +1,6 @@
 # ERiC for all ELSTER traffic, no self-built transport
 
-elster-cli sends every ELSTER request through ERiC (and Postfach attachments through Otto, shipped in the same package), although the Postfach procedures are part of the Offene Schnittstelle and could be implemented directly. The Kontoabfrage and all later sending (UStVA, ZM) are ERiC-only by ELSTER policy, so ERiC is unavoidable; once it is there, a second, self-built transport would duplicate code for no feature. We accept a runtime C library downloaded by the user (`elster-cli eric install`), per-version handling of the ERiC API, and no Linux arm64 support, since ELSTER ships no ERiC build for it.
+KIECLI sends every ELSTER request through ERiC (and Postfach attachments through Otto, shipped in the same package), although the Postfach procedures are part of the Offene Schnittstelle and could be implemented directly. The Kontoabfrage and all later sending (UStVA, ZM) are ERiC-only by ELSTER policy, so ERiC is unavoidable; once it is there, a second, self-built transport would duplicate code for no feature. We accept a runtime C library downloaded by the user (`kiecli eric install`), per-version handling of the ERiC API, and no Linux arm64 support, since ELSTER ships no ERiC build for it.
 
 ## Considered Options
 

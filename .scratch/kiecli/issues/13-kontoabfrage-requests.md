@@ -10,7 +10,7 @@ Which Kontoabfrage request kinds does v1 support (`O` offene Beträge, `I` gelei
 
 Context: [ERiC and the Kontoabfrage](03-eric-kontoabfrage.md) (schemas `eko_*_000006.xsd`, one Steuerfall per request, Steuernummern must match the Empfänger Finanzamt, a Vollmacht is presupposed); [ERiC for the Kontoabfrage](07-eric-decision.md) (sent through ERiC).
 
-Where the identifiers come from is settled by [Configuration and secrets](10-config-and-secrets.md): per-profile config keys, overridable by flag and `ELSTER_CLI_*` env var; this ticket names the fields.
+Where the identifiers come from is settled by [Configuration and secrets](10-config-and-secrets.md): per-profile config keys, overridable by flag and `KIECLI_*` env var; this ticket names the fields.
 
 ## Answer
 
@@ -21,9 +21,9 @@ Facts from `docs/API/ElsterKontoabfrage_v2.1.3.zip`: one request holds up to 75 
 ### Commands
 
 ```
-elster-cli kontoabfrage offene-betraege
-elster-cli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
-elster-cli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
+kiecli kontoabfrage offene-betraege
+kiecli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
+kiecli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
 ```
 
 1. All three Abfragearten (`O`, `I`, `ZS`) in v1, one per call. Mixing Abfragearten in one request is not offered.
@@ -33,7 +33,7 @@ elster-cli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
 
 ### Taxpayer identifiers
 
-5. Settings `steuernummer` and optional `bundesland` (two-letter code), scope profile, flags `--steuernummer`/`--bundesland`, env `ELSTER_CLI_STEUERNUMMER`/`ELSTER_CLI_BUNDESLAND`. Needed only by `kontoabfrage`.
+5. Settings `steuernummer` and optional `bundesland` (two-letter code), scope profile, flags `--steuernummer`/`--bundesland`, env `KIECLI_STEUERNUMMER`/`KIECLI_BUNDESLAND`. Needed only by `kontoabfrage`.
 6. A 13-digit ELSTER-format Steuernummer is used as is; a Bescheid-format one is converted with `bundesland` (via `EricMakeElsterStnr` if the spike confirms it, otherwise a table as in haben's `packages/core/src/steuernummer.ts`). Bescheid format without `bundesland` is exit 2 with a `help` naming the flag. The Bescheid format alone is ambiguous (BB, SN and ST share prefix 3 with 11 digits).
 7. The Empfänger (Bundesfinanzamtsnummer) is always derived from the Steuernummer, never a setting.
 8. Exactly one Steuernummer per call; further Steuernummern of the same Taxpayer go in other profiles or a `--steuernummer` override.

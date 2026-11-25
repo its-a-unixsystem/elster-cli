@@ -1,6 +1,6 @@
 # AGPL-3.0-only with an additional permission for ERiC and Otto
 
-elster-cli is licensed `AGPL-3.0-only`, like haben, so modified versions, including ones run as a service, stay open. Because the CLI loads the proprietary ERiC and Otto into its own process and they are not System Libraries, the plain AGPL would forbid conveying a modified elster-cli meant to use them, or running one as a network service, since their source cannot be provided. A GPLv3 §7 additional permission allows combining the program with ERiC and Otto as published by ELSTER and conveying the result without the AGPL applying to them.
+KIECLI is licensed `AGPL-3.0-only`, like haben, so modified versions, including ones run as a service, stay open. Because the CLI loads the proprietary ERiC and Otto into its own process and they are not System Libraries, the plain AGPL would forbid conveying a modified KIECLI meant to use them, or running one as a network service, since their source cannot be provided. A GPLv3 §7 additional permission allows combining the program with ERiC and Otto as published by ELSTER and conveying the result without the AGPL applying to them.
 
 ## Considered Options
 

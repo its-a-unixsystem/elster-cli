@@ -2,11 +2,11 @@
 
 Type: task
 Status: open
-Blocked by: ../../elster-cli/issues/11-test-system-spike.md
+Blocked by: ../../kiecli/issues/11-test-system-spike.md
 
 ## Question
 
-No download shows a real Datenpaket of a Bescheid, and the test system may never deliver one. HITL: with the real Certificate, run an Anfrage over the Bescheid-carrying Bereitstellungsdatenarten and an Abholung with explicit Bestätigung of the Bescheide found, using the spike's ERiC call from [Test-system spike: ERiC end to end](../../elster-cli/issues/11-test-system-spike.md) (or the CLI once it exists).
+No download shows a real Datenpaket of a Bescheid, and the test system may never deliver one. HITL: with the real Certificate, run an Anfrage over the Bescheid-carrying Bereitstellungsdatenarten and an Abholung with explicit Bestätigung of the Bescheide found, using the spike's ERiC call from [Test-system spike: ERiC end to end](../../kiecli/issues/11-test-system-spike.md) (or the CLI once it exists).
 
 Keep every fetched file outside this repository. Record here only anonymised structure notes per Bereitstellungsdatenart: element names or Bescheidwertnummern present, encoding, inner layering (gzip, base64), schema or version markers, which Anhänge came alongside, and whether a kind delivered only a PDF. Never values, Steuernummern, names or amounts.
 

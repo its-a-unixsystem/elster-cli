@@ -20,3 +20,5 @@ Cover: whether one HerstellerID may be used by all users of an open-source tool 
 - Eight questions for ELSTER are listed in the research file.
 
 Details: [research/04-open-source-terms.md](../research/04-open-source-terms.md)
+
+Amended by [Obtain a HerstellerID](06-obtain-herstellerid.md): ELSTER refused the product name "elster-cli" in the HerstellerID application. The project is now KIECLI; the non-affiliation notice and the no-logo rule stand.

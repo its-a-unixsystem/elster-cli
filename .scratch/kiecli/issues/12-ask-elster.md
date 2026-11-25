@@ -18,14 +18,14 @@ Answers feed ERiC for the Kontoabfrage, Configuration and secrets, the testing s
 
 ## Answer
 
-**Not sent.** elster-cli is a small open-source tool; v1 proceeds on the readings below without asking ELSTER. If ELSTER ever objects to one of them, reopen the ticket named next to it.
+**Not sent.** KIECLI is a small open-source tool; v1 proceeds on the readings below without asking ELSTER. If ELSTER ever objects to one of them, reopen the ticket named next to it.
 
 1. Redistribution: nothing from the ELSTER downloads goes into the repository; fixtures are hand-written with invented data (testing strategy).
 2. HerstellerID: each user supplies their own; the project holds none in code (Configuration and secrets).
 3. 24 h Bestätigung: binds every ID holder collecting real data; the CLI confirms only on explicit request and must make the deadline visible to the caller (Agent interface).
 4. Testlauf and product registration: whatever ELSTER requires is part of each user's own HerstellerID application, not the tool's concern.
 5. Public CI: test certificates downloaded from `download.elster.de` at test time, never committed; our HerstellerID only as a CI secret (testing strategy).
-6. Name: "elster-cli" stays, with a non-affiliation notice and no ELSTER logo or look (distribution).
+6. Name: KIECLI, with a non-affiliation notice and no ELSTER logo or look (distribution). ELSTER refused the first name, "elster-cli", in the HerstellerID application ([Obtain a HerstellerID](06-obtain-herstellerid.md)).
 7. ERiC licence: the CLI never ships ERiC; each user downloads it through `eric install` after explicit `--accept-eric-terms` (ERiC for the Kontoabfrage).
 
 The drafted questions remain under "Open points" in [ELSTER terms for an open-source client](../research/04-open-source-terms.md) if they ever need asking.

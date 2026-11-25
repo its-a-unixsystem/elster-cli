@@ -6,12 +6,12 @@ Blocked by:
 
 ## Question
 
-How is elster-cli tested, from unit tests up to the ELSTER test system, and which parts run in CI? Settle:
+How is KIECLI tested, from unit tests up to the ELSTER test system, and which parts run in CI? Settle:
 
 - **Fixtures:** hand-written with invented data, because ELSTER's `Beispiele` may not be redistributed ([ELSTER terms for an open-source client](04-open-source-terms.md)). Decide where they live and how they are kept valid against ELSTER's schemas and ERiC's plugins.
 - **The fake behind the `eric` module's trait** ([Go or Rust](08-language.md)), versus haben's C mocks. Decide what it must simulate: ERiC and Otto return codes, Otto streaming, a partial Abholung, PIN and certificate errors and certificate properties ([Certificate inspection](14-certificate-inspection.md)), and Kontoabfrage responses in both formats ([Kontoabfrage requests and responses](13-kontoabfrage-requests.md)).
 - **Test certificates:** downloaded from `download.elster.de` at test time, never committed. Decide where they are cached.
-- **ERiC in tests:** CI downloads it anonymously at test time, with the same pinned SHA-256 as `eric install`. ERiC refuses even local validation without a HerstellerID, so CI needs `ELSTER_CLI_HERSTELLER_ID` as a secret. Decide which jobs get it (fork PRs get no secrets) and what runs without it.
+- **ERiC in tests:** CI downloads it anonymously at test time, with the same pinned SHA-256 as `eric install`. ERiC refuses even local validation without a HerstellerID, so CI needs `KIECLI_HERSTELLER_ID` as a secret. Decide which jobs get it (fork PRs get no secrets) and what runs without it.
 - **Test-system runs:** which commands run, with the Testmerker, and how often (manual, nightly, per release). Whether they can run in CI waits on facts from [Test-system spike: ERiC end to end](11-test-system-spike.md); the rest of the strategy does not.
 - **Contract tests:** `describe` output, the JSON Schemas for stdout and errors, and the semver rule from [Agent interface](09-agent-interface.md) (removing or renaming a field is a major change).
 - **The final live check** with a real Certificate: who runs it, when, against which checklist, and that nothing from it reaches the repo.
@@ -19,7 +19,7 @@ How is elster-cli tested, from unit tests up to the ELSTER test system, and whic
 
 ## Answer
 
-**Three layers: command logic against an in-process fake, the binding and our XML against real ERiC offline, and the ELSTER test system behind a gated job. Only the last needs the real HerstellerID: ERiC validates locally with any five-digit ID except the blocked 74931 (experiment below), so fork PRs run real ERiC too.** CI is GitHub Actions on [its-a-unixsystem/elster-cli](https://github.com/its-a-unixsystem/elster-cli).
+**Three layers: command logic against an in-process fake, the binding and our XML against real ERiC offline, and the ELSTER test system behind a gated job. Only the last needs the real HerstellerID: ERiC validates locally with any five-digit ID except the blocked 74931 (experiment below), so fork PRs run real ERiC too.** CI is GitHub Actions on [its-a-unixsystem/kiecli](https://github.com/its-a-unixsystem/kiecli).
 
 ### Fake and binding
 
@@ -37,8 +37,8 @@ How is elster-cli tested, from unit tests up to the ELSTER test system, and whic
 
 ### Downloads
 
-9. ERiC jar, `Test_Zertifikate.zip` and the schema zips come from `download.elster.de` at test time, each pinned by SHA-256 in one checked-in manifest `tests/downloads.toml`; a mismatch fails loudly. Cache: `$XDG_CACHE_HOME/elster-cli-test/<sha256>/`. ERiC is installed there by our own `elster-cli eric install --eric-dir …`, dogfooding the install path. CI caches the directory keyed on the manifest hash.
-10. Tests needing a download skip when offline locally; `ELSTER_CLI_TEST_REQUIRE_DOWNLOADS=1` (set in CI) turns a skip into a failure.
+9. ERiC jar, `Test_Zertifikate.zip` and the schema zips come from `download.elster.de` at test time, each pinned by SHA-256 in one checked-in manifest `tests/downloads.toml`; a mismatch fails loudly. Cache: `$XDG_CACHE_HOME/kiecli-test/<sha256>/`. ERiC is installed there by our own `kiecli eric install --eric-dir …`, dogfooding the install path. CI caches the directory keyed on the manifest hash.
+10. Tests needing a download skip when offline locally; `KIECLI_TEST_REQUIRE_DOWNLOADS=1` (set in CI) turns a skip into a failure.
 
 ### Contract tests
 
@@ -52,10 +52,10 @@ How is elster-cli tested, from unit tests up to the ELSTER test system, and whic
 |---|---|---|---|
 | `checks` | every push and PR, forks included | none | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (unit, fake-driven, contract, `assert_cmd`), `cargo deny check` (licences, RustSec) |
 | `eric-local` | every push and PR, forks included | none | real ERiC from the cache: binding tests, golden requests validated with `PLATZHALTER_HERSTELLER_ID = "12345"`, response fixtures against the XSDs, canary asserting `74931` → 610301202, so an ERiC change that blocks placeholder IDs fails as one clear test |
-| `test-system` | manual, release gate, weekly | `ELSTER_CLI_HERSTELLER_ID` | the test-system run (items 16–18) and the leak guard (item 19) |
+| `test-system` | manual, release gate, weekly | `KIECLI_HERSTELLER_ID` | the test-system run (items 16–18) and the leak guard (item 19) |
 
 14. Toolchain pinned in `rust-toolchain.toml`; no MSRV matrix, no coverage gate; `ubuntu-latest` only.
-15. **Secret:** `ELSTER_CLI_HERSTELLER_ID` exists only as an environment secret, never a repository secret. Environment `elster-test`: deployments from `main` and release tags, the maintainer as required reviewer (manual and release runs). Environment `elster-test-scheduled`: `main` only, no reviewer (the weekly run). Never `pull_request_target`, never PR code checked out with the secret.
+15. **Secret:** `KIECLI_HERSTELLER_ID` exists only as an environment secret, never a repository secret. Environment `elster-test`: deployments from `main` and release tags, the maintainer as required reviewer (manual and release runs). Environment `elster-test-scheduled`: `main` only, no reviewer (the weekly run). Never `pull_request_target`, never PR code checked out with the secret.
 
 ### Test-system runs
 
@@ -65,7 +65,7 @@ How is elster-cli tested, from unit tests up to the ELSTER test system, and whic
 
 ### Leak guard
 
-19. Whenever `ELSTER_CLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `ELSTER_CLI_CERTIFICATE` (if set), and fails on a hit.
+19. Whenever `KIECLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `KIECLI_CERTIFICATE` (if set), and fails on a hit.
 
 ### Final live check
 

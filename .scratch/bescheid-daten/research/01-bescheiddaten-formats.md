@@ -1,6 +1,6 @@
 # 01 - Bescheiddaten formats per Bereitstellungsdatenart
 
-Ticket: `issues/01-bescheiddaten-formats.md`. Terms follow `GLOSSARY.md`. Facts about Datenabholung (lifecycle, Objektspeicher, Bestätigung) are in `../../elster-cli/research/02-postfach-lifecycle.md` and not repeated.
+Ticket: `issues/01-bescheiddaten-formats.md`. Terms follow `GLOSSARY.md`. Facts about Datenabholung (lifecycle, Objektspeicher, Bestätigung) are in `../../kiecli/research/02-postfach-lifecycle.md` and not repeated.
 
 Sources (documents unzipped or downloaded into a scratch directory, never into the repo; page numbers are the PDF's own):
 
@@ -34,7 +34,7 @@ Both the receiver-side and the sender-side specification say the same thing, so 
 
 - Sender side (SSb-BEM 5.4.1): Base64 content is decoded, then encrypted and compressed. Stored object = compressed, then CMS-encrypted. The size fields in SSb-DA (`Datenpaket/Groesse`, `DateiGroesse`) are the size of the "kodierten, komprimierten und verschlüsselten Inhalts" (pp. 18-19); EH 9.2.1 (p. 280) adds "Base64-codierter Form" for the PostfachAnfrage size.
 - OTTER delivers CMS/PKCS#7 EnvelopedData for the requesting Certificate (SSb-OTTER 5.12.4.3, see research 02); HTTP `Content-Encoding: gzip` in OTTER is transport compression only (SSb-OTTER lines on "gzip-Komprimierung", OAS).
-- Otto (API, status codes `OTTO_ENTSCHLUESSELN_FEHLGESCHLAGEN`, `OTTO_DEKOMPRESSION_FEHLGESCHLAGEN`, API p. 260) decrypts and decompresses itself when it holds the Certificate. With the "Abholzertifikat" variants (`OttoEmpfangBeginnenAbholzertifikat`, `OttoDatenAbholen`) Otto returns the still-encrypted data and the caller decrypts with `EricDekodiereDaten` (API pp. 73-74, 224-232). So **[inference]**: with the normal flow (Certificate = Zertifikat in the soft-PSE) elster-cli gets the plain Datenpaket bytes from Otto in the stated `Encoding`, with no Base64 or gzip step of its own; the compression algorithm is not named in the Datenabholung documents (the legacy TransferHeader says `Kompression` = GZIP). To be confirmed on a real sample (ticket 03).
+- Otto (API, status codes `OTTO_ENTSCHLUESSELN_FEHLGESCHLAGEN`, `OTTO_DEKOMPRESSION_FEHLGESCHLAGEN`, API p. 260) decrypts and decompresses itself when it holds the Certificate. With the "Abholzertifikat" variants (`OttoEmpfangBeginnenAbholzertifikat`, `OttoDatenAbholen`) Otto returns the still-encrypted data and the caller decrypts with `EricDekodiereDaten` (API pp. 73-74, 224-232). So **[inference]**: with the normal flow (Certificate = Zertifikat in the soft-PSE) KIECLI gets the plain Datenpaket bytes from Otto in the stated `Encoding`, with no Base64 or gzip step of its own; the compression algorithm is not named in the Datenabholung documents (the legacy TransferHeader says `Kompression` = GZIP). To be confirmed on a real sample (ticket 03).
 
 ## 3. The ESB/USB/GSB record format (BDS-2), EH ch. 15.4
 
@@ -73,25 +73,25 @@ Nothing beyond transport. Checked the API reference function list (EricXxx, Eric
 - No function parses, renders, compares or validates a Bescheiddatensatz or a Bescheid. The only Bescheid-named functions are `EricMakeElsterStnr`/`EricFormatStNr` and the Einheitswert-Aktenzeichen helpers (steuernummer formatting).
 - Relevant functions are `EricBearbeiteVorgang` (PostfachAnfrage/Bestätigung), the Otto family (fetch, decrypt, decompress), `EricDekodiereDaten` (decrypt only, for the Abholzertifikat variants), `EricHoleZertifikatFingerabdruck` (CEZ fingerprint for the "send-NoSig" retrieval path).
 - ERiC checks only the Datenabholung request/response XML (plug-in `checkElsterDatenabholung`, `datenartVersion` 32; `Datenartversionmatrix.ods`). The Datenpaket content, BDS-2 or otherwise, is outside ERiC's validation.
-- Consequence: **elster-cli must parse BDS-2 itself** (a small, fixed-width parser) and must carry or load a Bescheidwertnummer table itself; nothing in ERiC substitutes. For the PDF/A-3 Gewerbesteuerbescheid, ERiC has nothing either.
+- Consequence: **KIECLI must parse BDS-2 itself** (a small, fixed-width parser) and must carry or load a Bescheidwertnummer table itself; nothing in ERiC substitutes. For the PDF/A-3 Gewerbesteuerbescheid, ERiC has nothing either.
 
 ## 6. Coupling between the return filed and the Bescheiddaten kinds
 
-EH 7.4 (pp. 184-186): ESB/USB/GSB exist only if the Erklärung was filed with `Rueckuebermittlung bescheid="ja"` (EDS-XML v2). The Zuordnungskriterium decides who can fetch: with `send-Auth` and no `SchluesselRueckuebermittlung` ("nur ein Bearbeiter") it is the same Mein-ELSTER-Zertifikat that filed; with a client-generated certificate (CEZ) as `SchluesselRueckuebermittlung` ("mehrere Bearbeiter") it is that CEZ's fingerprint, fetched with `send-NoSig` plus `Fingerprint` (Tables 7-1, 7-2). So **[inference]**: elster-cli with the user's Certificate sees an ESB only for returns filed with it (or for which the account was the recipient); an ESB bound to another software's CEZ is not visible. The public ELSTER FAQ ("Bescheiddaten" 180 days, 60 days after Abholung, see research 02) and forum threads (DATEV/WISO "nur mit der Software abholbar") are consistent with this, but they are secondary sources.
+EH 7.4 (pp. 184-186): ESB/USB/GSB exist only if the Erklärung was filed with `Rueckuebermittlung bescheid="ja"` (EDS-XML v2). The Zuordnungskriterium decides who can fetch: with `send-Auth` and no `SchluesselRueckuebermittlung` ("nur ein Bearbeiter") it is the same Mein-ELSTER-Zertifikat that filed; with a client-generated certificate (CEZ) as `SchluesselRueckuebermittlung` ("mehrere Bearbeiter") it is that CEZ's fingerprint, fetched with `send-NoSig` plus `Fingerprint` (Tables 7-1, 7-2). So **[inference]**: KIECLI with the user's Certificate sees an ESB only for returns filed with it (or for which the account was the recipient); an ESB bound to another software's CEZ is not visible. The public ELSTER FAQ ("Bescheiddaten" 180 days, 60 days after Abholung, see research 02) and forum threads (DATEV/WISO "nur mit der Software abholbar") are consistent with this, but they are secondary sources.
 
 ## 7. Developer-area-only documents found (for ticket 02)
 
 | Document | Where named | Why it matters |
 |---|---|---|
 | `Bescheidnr_*.zip` with `Bescheidwertnummern_ESt.xml`, `Bescheidwertnummern_GSt.xml`, `Bescheidwertnummern_USt.xml` | EH 4.3.5 Table 4-5 (p. 78), EH 9.1 (p. 277), haben `docs/roadmap.md` | The only definition of Bescheidwert numbers (key figures of ESB/USB/GSB). Version "Aktuelle Version" |
-| "Schlüsselkatalog 'Art des Schreibens' für DIVA" | EH Table 4-5 (p. 78) | Catalogue behind the DIVA Meta `dokumenttyp`; would let elster-cli name the DIVA document type |
+| "Schlüsselkatalog 'Art des Schreibens' für DIVA" | EH Table 4-5 (p. 78) | Catalogue behind the DIVA Meta `dokumenttyp`; would let KIECLI name the DIVA document type |
 | "Dokumentation zum Bescheid zur InvStG51Feststellung" | EH ch. on `InvStG51Feststellung`, Eigenschaftentabelle (p. 225, "Siehe auch ELSTER-Entwicklerbereich") | Probably PDF-only anyway; only needed if the kind is in scope |
 | Musterbescheide Grundsteuer | EH pp. 230-231 (ERiC download page, "Musterbescheide Grundsteuer", behind the licence click-through) | Sample PDFs; no data format |
 | ELSTER-Fehlerliste, "Einheitliche_Datenschnittstelle_XML" | already in `docs/API/` or the ERiC zip | Not Bescheid-specific |
 
 Everything else needed for the BDS-2 layout is public. The Datenabholung SSb says the document is filed at `elster.de/elsterweb/entwickler/infoseite/schnittstellenbeschreibungen` (login), but the same PDF is in the public `docs/API` download. The "Spezifikation Digitaler Gewerbesteuerbescheid" is on a public site and xrepository.de, not in the developer area.
 
-**Redistribution terms**: `lizenz.pdf` § 4(1) grants the right to integrate and distribute ERiC and the demo code in one's own product; it says nothing about the documentation, schemas or lists. `lizenz.pdf` § 3(3): the manufacturer must use ERiC per the delivered documentation and "the further documentation on the ELSTER download pages for developers". No licence or redistribution text is attached to the `Bescheidnr_*.zip` in the sources I could read **[not found]** (the zip itself is not available to me). The Gewerbesteuerbescheid pages state no licence for the files; FAQ-GewSt Q8 says "keine Lizenzgebühren" for using the specification, which is a statement about fees, not redistribution. See also `../../elster-cli/research/04-open-source-terms.md`.
+**Redistribution terms**: `lizenz.pdf` § 4(1) grants the right to integrate and distribute ERiC and the demo code in one's own product; it says nothing about the documentation, schemas or lists. `lizenz.pdf` § 3(3): the manufacturer must use ERiC per the delivered documentation and "the further documentation on the ELSTER download pages for developers". No licence or redistribution text is attached to the `Bescheidnr_*.zip` in the sources I could read **[not found]** (the zip itself is not available to me). The Gewerbesteuerbescheid pages state no licence for the files; FAQ-GewSt Q8 says "keine Lizenzgebühren" for using the specification, which is a statement about fees, not redistribution. See also `../../kiecli/research/04-open-source-terms.md`.
 
 ## 8. Existing open-source clients
 

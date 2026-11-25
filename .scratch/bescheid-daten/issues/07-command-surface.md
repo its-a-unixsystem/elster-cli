@@ -6,9 +6,9 @@ Blocked by:
 
 ## Question
 
-Where does the Bescheiddaten JSON appear in elster-cli? The three sources are fixed by [Redraw the destination after the format finding](04-redraw-destination.md): the BDS-2 Datenpaket of `ESB`/`USB`/`GSB`, the XUnternehmen.Gewerbesteuer XML embedded in a `Gewerbesteuerbescheid`, and the decoded DIVA2 metadata.
+Where does the Bescheiddaten JSON appear in KIECLI? The three sources are fixed by [Redraw the destination after the format finding](04-redraw-destination.md): the BDS-2 Datenpaket of `ESB`/`USB`/`GSB`, the XUnternehmen.Gewerbesteuer XML embedded in a `Gewerbesteuerbescheid`, and the decoded DIVA2 metadata.
 
-- a field per Nachricht in the `postfach abholung` output (v1 shape in [Agent interface](../../elster-cli/issues/09-agent-interface.md));
+- a field per Nachricht in the `postfach abholung` output (v1 shape in [Agent interface](../../kiecli/issues/09-agent-interface.md));
 - a separate offline command over a Datenpaket or Anhang already written to disk (e.g. `bescheid lesen <file>`), needing no Certificate or ERiC;
 - both.
 

@@ -1,4 +1,4 @@
-# elster-cli
+# KIECLI
 
 A command-line client that retrieves a single taxpayer's data from ELSTER, the German tax administration's electronic interface, for use by AI agents.
 

@@ -1,12 +1,12 @@
-# elster-cli v1 specification
+# KIECLI v1 specification
 
-Status: **draft**. Items marked ⏳ wait on [Test-system spike: ERiC end to end](issues/11-test-system-spike.md), which waits on [Obtain a HerstellerID](issues/06-obtain-herstellerid.md). [Pending the spike](#15-pending-the-spike) lists all of them. Everything else is decided.
+Status: **draft**. Items marked ⏳ wait on [Test-system spike: ERiC end to end](issues/11-test-system-spike.md). [Pending the spike](#15-pending-the-spike) lists all of them. Everything else is decided.
 
-This spec assembles the decisions of the [elster-cli v1 map](map.md). Each section names the ticket that holds the reasoning; where this spec and a ticket disagree, the ticket wins and this spec is wrong. Domain terms follow [`GLOSSARY.md`](../../GLOSSARY.md).
+This spec assembles the decisions of the [KIECLI v1 map](map.md). Each section names the ticket that holds the reasoning; where this spec and a ticket disagree, the ticket wins and this spec is wrong. Domain terms follow [`GLOSSARY.md`](../../GLOSSARY.md).
 
 ## 1. Product
 
-elster-cli is a stateless, non-interactive command-line client for AI agents. For one Taxpayer per call it:
+KIECLI is a stateless, non-interactive command-line client for AI agents. For one Taxpayer per call it:
 
 - reads the Postfach: Anfrage, Abholung of Datenpaket and Anhänge from the Objektspeicher, and Bestätigung on explicit request;
 - runs the Kontoabfrage in all three Abfragearten;
@@ -51,7 +51,7 @@ Sources: [Go or Rust](issues/08-language.md), [ERiC for the Kontoabfrage](issues
 
 Source: [ERiC for the Kontoabfrage](issues/07-eric-decision.md), amended by [Distribution](issues/16-distribution.md).
 
-1. `elster-cli eric install [--version X] --accept-eric-terms [--sha256 H]`:
+1. `kiecli eric install [--version X] --accept-eric-terms [--sha256 H]`:
    - Anonymous download from `https://download.elster.de/download/eric/eric_<major>/ERiC-<version>-Linux-x86_64.jar`; redirects to other hosts are refused.
    - Extracts only the current platform into a versioned directory under the ERiC directory (`eric_dir`, default the OS data directory) and switches over only after a complete extract.
    - Never runs implicitly. A hand-unpacked ERiC directory also works.
@@ -68,19 +68,19 @@ Source: [Configuration and secrets](issues/10-config-and-secrets.md), amended by
 
 ### Layers
 
-Precedence: flag > environment (`ELSTER_CLI_` + upper-cased key) > config file > built-in default. No OS keychain backend.
+Precedence: flag > environment (`KIECLI_` + upper-cased key) > config file > built-in default. No OS keychain backend.
 
 | Setting | Flag | Env | Config key | Scope |
 |---|---|---|---|---|
-| Certificate path | `--certificate` | `ELSTER_CLI_CERTIFICATE` | `certificate` | profile |
-| PIN | `--pin-file`, `--pin-command` | `ELSTER_CLI_PIN`, `ELSTER_CLI_PIN_FILE`, `ELSTER_CLI_PIN_COMMAND` | `pin_file`, `pin_command` | profile |
-| Testmerker | `--test` / `--no-test` | `ELSTER_CLI_TEST=0\|1` | `test` | profile |
-| Steuernummer (ELSTER or Bescheid format) | `--steuernummer` | `ELSTER_CLI_STEUERNUMMER` | `steuernummer` | profile |
-| Bundesland (only for a Bescheid-format Steuernummer) | `--bundesland` | `ELSTER_CLI_BUNDESLAND` | `bundesland` | profile |
-| HerstellerID | `--hersteller-id` | `ELSTER_CLI_HERSTELLER_ID` | `hersteller_id` | top-level |
-| ERiC directory | `--eric-dir` | `ELSTER_CLI_ERIC_DIR` | `eric_dir` | top-level |
-| Profile | `--profile` | `ELSTER_CLI_PROFILE` | `default_profile` | top-level |
-| Config file | `--config` | `ELSTER_CLI_CONFIG` | | |
+| Certificate path | `--certificate` | `KIECLI_CERTIFICATE` | `certificate` | profile |
+| PIN | `--pin-file`, `--pin-command` | `KIECLI_PIN`, `KIECLI_PIN_FILE`, `KIECLI_PIN_COMMAND` | `pin_file`, `pin_command` | profile |
+| Testmerker | `--test` / `--no-test` | `KIECLI_TEST=0\|1` | `test` | profile |
+| Steuernummer (ELSTER or Bescheid format) | `--steuernummer` | `KIECLI_STEUERNUMMER` | `steuernummer` | profile |
+| Bundesland (only for a Bescheid-format Steuernummer) | `--bundesland` | `KIECLI_BUNDESLAND` | `bundesland` | profile |
+| HerstellerID | `--hersteller-id` | `KIECLI_HERSTELLER_ID` | `hersteller_id` | top-level |
+| ERiC directory | `--eric-dir` | `KIECLI_ERIC_DIR` | `eric_dir` | top-level |
+| Profile | `--profile` | `KIECLI_PROFILE` | `default_profile` | top-level |
+| Config file | `--config` | `KIECLI_CONFIG` | | |
 
 - Flag-only: `--format`, `-v`, `--eric-log`.
 - Live by default; `test` puts the Testmerker on every request. The Testmerker values differ by procedure: Kontoabfrage `230000001`, Postfach `700000001` ⏳ (confirm which Postfach Testmerker the test system expects through ERiC).
@@ -88,15 +88,15 @@ Precedence: flag > environment (`ELSTER_CLI_` + upper-cased key) > config file >
 
 ### PIN
 
-1. Only via `ELSTER_CLI_PIN`, a PIN file or a PIN command. Never a `--pin` flag, never a literal PIN in the config file, never a prompt, even on a TTY. No PIN available: exit 3, with an error listing the three ways.
+1. Only via `KIECLI_PIN`, a PIN file or a PIN command. Never a `--pin` flag, never a literal PIN in the config file, never a prompt, even on a TTY. No PIN available: exit 3, with an error listing the three ways.
 2. **PIN file:** contains only the PIN; one trailing newline is stripped. If group or others can read it: warning `pin_file_permissions`, not a refusal.
 3. **PIN command:** run via `/bin/sh -c` with stdin `/dev/null`; the PIN is stdout minus one trailing newline. Empty output, a non-zero exit or a 30 s timeout is exit 3, with the captured stderr in `cause`. It runs only for commands that open the Certificate (not `eric install|status`, `describe`, `skill`, `config show`).
 4. The PIN is held in a zeroizing buffer and dropped after ERiC and Otto have used it; it is never echoed in any output.
 
 ### Config file
 
-1. TOML at `$XDG_CONFIG_HOME/elster-cli/config.toml` (default `~/.config/elster-cli/config.toml`).
-   - A missing default file is fine. A missing file named by `--config` or `ELSTER_CLI_CONFIG` is exit 3.
+1. TOML at `$XDG_CONFIG_HOME/kiecli/config.toml` (default `~/.config/kiecli/config.toml`).
+   - A missing default file is fine. A missing file named by `--config` or `KIECLI_CONFIG` is exit 3.
    - Unknown keys are exit 3, with a did-you-mean `help`.
    - `~` is expanded. Relative paths resolve against the config file's directory; paths from flags and env resolve against the working directory.
 2. `[profile.NAME]` holds the per-Taxpayer keys. `hersteller_id`, `eric_dir` and `default_profile` are top-level, and per-Taxpayer keys are not allowed at top level.
@@ -115,7 +115,7 @@ pin_file = "~/elster/firma.pin"
 test = true
 ```
 
-3. **Profile selection:** `--profile` > `ELSTER_CLI_PROFILE` > `default_profile` > the only profile in the file. With several profiles and none chosen: exit 3, listing the names. Flags and env override single fields of the selected profile; when an env var overrides a field the profile sets, warning `env_overrides_profile` names the field.
+3. **Profile selection:** `--profile` > `KIECLI_PROFILE` > `default_profile` > the only profile in the file. With several profiles and none chosen: exit 3, listing the names. Flags and env override single fields of the selected profile; when an env var overrides a field the profile sets, warning `env_overrides_profile` names the field.
 4. A missing required setting is exit 3, and the error's `notes` name its flag, env var and config key. A Certificate path that does not exist or cannot be read is exit 3 before ERiC starts.
 
 ## 5. Commands
@@ -123,20 +123,20 @@ test = true
 Sources: [Agent interface](issues/09-agent-interface.md), [Kontoabfrage requests and responses](issues/13-kontoabfrage-requests.md), [Certificate inspection](issues/14-certificate-inspection.md), [Configuration and secrets](issues/10-config-and-secrets.md).
 
 ```
-elster-cli postfach status        [--datenart X…] [--neue|--alle] [--von D] [--bis D]
-elster-cli postfach anfrage       [--datenart X…] [--neue|--alle] [--von D] [--bis D]
-elster-cli postfach abholung      (--id ID… | --neue) --out DIR (--bestaetigen | --ohne-bestaetigung)
+kiecli postfach status        [--datenart X…] [--neue|--alle] [--von D] [--bis D]
+kiecli postfach anfrage       [--datenart X…] [--neue|--alle] [--von D] [--bis D]
+kiecli postfach abholung      (--id ID… | --neue) --out DIR (--bestaetigen | --ohne-bestaetigung)
                                   [--datenart X…] [--mit-meta]
-elster-cli postfach bestaetigung  --id ID…
-elster-cli kontoabfrage offene-betraege
-elster-cli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
-elster-cli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
-elster-cli zertifikat status
-elster-cli eric install [--version X] --accept-eric-terms [--sha256 H]
-elster-cli eric status
-elster-cli config show [--profile X]
-elster-cli describe [command]
-elster-cli skill
+kiecli postfach bestaetigung  --id ID…
+kiecli kontoabfrage offene-betraege
+kiecli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
+kiecli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
+kiecli zertifikat status
+kiecli eric install [--version X] --accept-eric-terms [--sha256 H]
+kiecli eric status
+kiecli config show [--profile X]
+kiecli describe [command]
+kiecli skill
 ```
 
 **Global flags:** `--format json|text` (default `json`), `-v`, `--eric-log DIR`, plus the settings flags in §4. No command ever reads stdin interactively. Commands are named after ELSTER's lifecycle steps in German, ASCII-folded.
@@ -302,7 +302,7 @@ stderr carries exactly one JSON error object on failure, and never progress or l
 {"error": {"code": "datenart_unknown", "message": "unknown Bereitstellungsdatenart `DivaBescheidUst`",
   "notes": ["Bereitstellungsdatenart names are case-sensitive"],
   "help": "did you mean `DivaBescheidUSt`?",
-  "suggestion": "elster-cli postfach anfrage --datenart DivaBescheidUSt",
+  "suggestion": "kiecli postfach anfrage --datenart DivaBescheidUSt",
   "cause": [{"source": "eric|elster|otto", "code": 610301202, "text": "…"}],
   "retry": false}}
 ```
@@ -337,7 +337,7 @@ Every command that opens the Certificate calls `EricHoleZertifikatEigenschaften`
 | `gueltig_ab` in the future | `certificate_not_yet_valid` | 3 |
 | `testzertifikat` true and the call runs live | `test_certificate_requires_testmerker`, `suggestion` adds `--test` | 3 |
 
-All have `retry: false`. elster-cli never switches to test mode silently; a real Certificate with `--test` is allowed. ERiC has no error code for an expired Certificate, so the local check also spares the caller a server-side rejection.
+All have `retry: false`. KIECLI never switches to test mode silently; a real Certificate with `--test` is allowed. ERiC has no error code for an expired Certificate, so the local check also spares the caller a server-side rejection.
 
 ### 8.2 Kontoabfrage result codes
 
@@ -370,7 +370,7 @@ ERiC logs to a temporary directory that is deleted at exit, because the log may 
 
 ## 11. `SKILL.md`
 
-Embedded in the binary, printed by `elster-cli skill`, with the same file in the repo. English only. Short and task-shaped:
+Embedded in the binary, printed by `kiecli skill`, with the same file in the repo. English only. Short and task-shaped:
 
 1. The non-affiliation notice (§13.6). What the tool does and does not do.
 2. **Setup:** `eric install --accept-eric-terms`, then `eric status`. The agent stops and hands two steps back to the human, because they need a person: obtaining a HerstellerID, and setting up the Certificate and PIN source. Link `docs/getting-started.md` and the config docs.
@@ -408,8 +408,8 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
 2. Fixtures are hand-written with invented data: test Finanzamt 9198/9238 Steuernummern, invented tickets and objektids, Konto-IDs from a reserved invented range (prefix `TEST`). Test-system captures may shape fixtures but are never committed verbatim: identifiers are rewritten and the result reviewed.
 3. Response fixtures are validated against ELSTER's XSDs with `uppsala`. Golden requests are validated by real ERiC (`ERIC_VALIDIERE`, nothing sent).
 4. The ERiC jar, `Test_Zertifikate.zip` and the schema zips come from `download.elster.de` at test time, each pinned by SHA-256 in `tests/downloads.toml`; a mismatch fails loudly.
-   - Cache: `$XDG_CACHE_HOME/elster-cli-test/<sha256>/`. ERiC is installed there with `elster-cli eric install --eric-dir …`.
-   - Tests needing a download skip when offline; `ELSTER_CLI_TEST_REQUIRE_DOWNLOADS=1` (set in CI) turns a skip into a failure.
+   - Cache: `$XDG_CACHE_HOME/kiecli-test/<sha256>/`. ERiC is installed there with `kiecli eric install --eric-dir …`.
+   - Tests needing a download skip when offline; `KIECLI_TEST_REQUIRE_DOWNLOADS=1` (set in CI) turns a skip into a failure.
 
 ### 12.3 Contract tests
 
@@ -417,16 +417,16 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
 2. A semver test compares `schemas/` with the last release tag and requires a major bump for the breaking changes in §6.1.
 3. Every command output from the fake-driven tests is validated against its schema.
 
-### 12.4 CI (GitHub Actions, `its-a-unixsystem/elster-cli`)
+### 12.4 CI (GitHub Actions, `its-a-unixsystem/kiecli`)
 
 | Job | When | Secret | Runs |
 |---|---|---|---|
 | `checks` | every push and PR, forks included | none | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo deny check` (AGPL-compatible licence allowlist, RustSec), DCO `Signed-off-by` on every commit |
 | `eric-local` | every push and PR, forks included | none | real ERiC from the cache: binding tests, golden requests with placeholder `12345`, fixtures against the XSDs, a canary asserting `74931` → 610301202 |
-| `test-system` | manual, release gate, weekly | `ELSTER_CLI_HERSTELLER_ID` | `cargo test --features test-system` and the leak guard |
+| `test-system` | manual, release gate, weekly | `KIECLI_HERSTELLER_ID` | `cargo test --features test-system` and the leak guard |
 
 - `ubuntu-latest` only, toolchain from `rust-toolchain.toml`, no MSRV matrix, no coverage gate.
-- `ELSTER_CLI_HERSTELLER_ID` exists only as an environment secret:
+- `KIECLI_HERSTELLER_ID` exists only as an environment secret:
   - `elster-test`: `main` and release tags, maintainer as required reviewer;
   - `elster-test-scheduled`: `main` only, no reviewer, for the weekly run.
 
@@ -435,7 +435,7 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
   - Always: `zertifikat status`, `postfach status`, `postfach anfrage`, all three `kontoabfrage` kinds, and the live-call refusal.
   - ⏳ `postfach abholung --bestaetigen` and `postfach bestaetigung` join only if the test Postfach is safe for them (shared by every Hersteller? does it count toward our 24 h obligation?). Never `--ohne-bestaetigung` without a Bestätigung in the same run.
   - ⏳ If GitHub's runners cannot reach the test system, the same command runs on the maintainer's machine before each release, and the CI triggers are dropped.
-- **Leak guard:** whenever `ELSTER_CLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `ELSTER_CLI_CERTIFICATE`, and fails on a hit.
+- **Leak guard:** whenever `KIECLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `KIECLI_CERTIFICATE`, and fails on a hit.
 
 ### 12.5 Final live check
 
@@ -454,14 +454,14 @@ Sources: [Distribution](issues/16-distribution.md), ADR [0003](../../docs/adr/00
    3. zigbuild + glibc guard;
    4. draft GitHub Release, then publish;
    5. `cargo publish`.
-3. **Artifacts:** `elster-cli-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` (binary, `LICENSE`, `NOTICE`, `README.md`, `README.de.md`), plus a `SHA256SUMS` file and GitHub artifact attestations (Sigstore build provenance). No long-lived signing key.
-   - crates.io: crate `elster-cli`, with an explicit `include` allowlist in `Cargo.toml`.
+3. **Artifacts:** `kiecli-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` (binary, `LICENSE`, `NOTICE`, `README.md`, `README.de.md`), plus a `SHA256SUMS` file and GitHub artifact attestations (Sigstore build provenance). No long-lived signing key.
+   - crates.io: crate `kiecli`, with an explicit `include` allowlist in `Cargo.toml`.
    - `[package.metadata.binstall]` points at the tarball.
    - No `curl | sh` script and no distro packages.
 4. **Versioning:** `0.y.z` until the live check passes; 1.0.0 is the first release with the JSON stability promise. `CHANGELOG.md` follows Keep a Changelog, and every JSON Schema change needs an entry.
 5. **Licence:** `AGPL-3.0-only`, plus a GPLv3 §7 additional permission to combine the program with ERiC and Otto as published by ELSTER and convey the result. The text is in `LICENSE` and `NOTICE`. Contributions come in with a DCO sign-off and no CLA.
 6. **Non-affiliation notice**, fixed text, at the top of both READMEs, in `NOTICE`, in `SKILL.md` and in the crates.io `description`; never in `--version` or JSON. No logo or ELSTER imagery. The wording is checked before the first release:
-   > elster-cli is an independent open-source project. It is not affiliated with, endorsed by or supported by ELSTER, the Bayerisches Landesamt für Steuern or any tax authority. ELSTER® is a registered trademark of the Freistaat Bayern.
+   > KIECLI is an independent open-source project. It is not affiliated with, endorsed by or supported by ELSTER, the Bayerisches Landesamt für Steuern or any tax authority. ELSTER® is a registered trademark of the Freistaat Bayern.
 7. **Docs:**
    - Bilingual, with English canonical: `README.md`/`README.de.md` and `docs/getting-started.md`/`docs/getting-started.de.md`, each with 🇬🇧 | 🇩🇪 links at the top; the German files say that English wins on disagreement. Sync is asked for in `CONTRIBUTING.md` and by a PR-template checkbox.
    - English only: `SKILL.md`, `--help`, `describe`, JSON messages, ADRs, `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/live-check.md`.
@@ -469,7 +469,7 @@ Sources: [Distribution](issues/16-distribution.md), ADR [0003](../../docs/adr/00
    1. System requirements: Linux x86_64, glibc ≥ 2.25, `libgcc_s.so.1`.
    2. Install: tarball (verify `SHA256SUMS` or the attestation), `cargo binstall` or `cargo install`.
    3. `eric install --accept-eric-terms`, then `eric status`.
-   4. Own HerstellerID: Entwicklerbereich registration, then the HerstellerID application (days to weeks) ⏳ (details from [Obtain a HerstellerID](issues/06-obtain-herstellerid.md)).
+   4. Own HerstellerID: Entwicklerbereich registration (login after a few days), then the HerstellerID application in the developer portal naming the product and interfaces (ERiC, Sonstige); the ID can take a week. A product name containing "elster" may be refused ([Obtain a HerstellerID](issues/06-obtain-herstellerid.md)).
    5. Certificate and PIN setup (§4).
    6. `zertifikat status`.
    7. `--test` against the test system.
@@ -506,7 +506,6 @@ Each item names where its answer lands in this spec.
 | That a test certificate sent live is rejected | §8.1 |
 | Whether the test Postfach is shared and safe for Abholung and Bestätigung in recurring runs | §12.4 |
 | Whether GitHub runners reach the test system | §12.4 |
-| HerstellerID application details for users | §13.8 |
 
 ## 16. Sources
 
@@ -518,6 +517,7 @@ Each item names where its answer lands in this spec.
 | [Go or Rust](issues/08-language.md) | §2 |
 | [Agent interface](issues/09-agent-interface.md) | §5–§9, §11 |
 | [Configuration and secrets](issues/10-config-and-secrets.md) | §4, §5.5 |
+| [Obtain a HerstellerID](issues/06-obtain-herstellerid.md) | §13.8 |
 | [Kontoabfrage requests and responses](issues/13-kontoabfrage-requests.md) | §5.2, §6.3, §8.2 |
 | [Certificate inspection](issues/14-certificate-inspection.md) | §5.3, §6.2, §8.1 |
 | [Testing strategy](issues/15-testing-strategy.md) | §2.4, §12 |

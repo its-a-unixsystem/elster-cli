@@ -25,17 +25,17 @@ Constraint from [Postfach lifecycle and attachments](02-postfach-lifecycle.md): 
 ### Commands
 
 ```
-elster-cli postfach status        [--datenart X…] [--neue|--alle] [--von D] [--bis D]
-elster-cli postfach anfrage       [--datenart X…] [--neue|--alle] [--von D] [--bis D]
-elster-cli postfach abholung      (--id ID… | --neue) --out DIR (--bestaetigen | --ohne-bestaetigung) [--datenart X…] [--mit-meta]
-elster-cli postfach bestaetigung  --id ID…
-elster-cli kontoabfrage offene-betraege
-elster-cli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
-elster-cli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
+kiecli postfach status        [--datenart X…] [--neue|--alle] [--von D] [--bis D]
+kiecli postfach anfrage       [--datenart X…] [--neue|--alle] [--von D] [--bis D]
+kiecli postfach abholung      (--id ID… | --neue) --out DIR (--bestaetigen | --ohne-bestaetigung) [--datenart X…] [--mit-meta]
+kiecli postfach bestaetigung  --id ID…
+kiecli kontoabfrage offene-betraege
+kiecli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
+kiecli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
                                   # output and exit codes: Kontoabfrage requests and responses
-elster-cli eric install | status
-elster-cli describe [command]
-elster-cli skill
+kiecli eric install | status
+kiecli describe [command]
+kiecli skill
 ```
 
 Global: `--format json|text` (default json), `-v`, `--eric-log DIR`; credentials and test/live per [Configuration and secrets](10-config-and-secrets.md). Never interactive.
@@ -77,7 +77,7 @@ stderr carries only one JSON error object, never progress or log lines. Detailed
 {"error": {"code": "datenart_unknown", "message": "unknown Bereitstellungsdatenart `DivaBescheidUst`",
   "notes": ["Bereitstellungsdatenart names are case-sensitive", "…"],
   "help": "did you mean `DivaBescheidUSt`?",
-  "suggestion": "elster-cli postfach anfrage --datenart DivaBescheidUSt",
+  "suggestion": "kiecli postfach anfrage --datenart DivaBescheidUSt",
   "cause": [{"source": "eric|elster|otto", "code": 610301202, "text": "…"}],
   "retry": false}}
 ```
@@ -105,7 +105,7 @@ ERiC logs to a temporary directory deleted at exit (the log may contain tax data
 
 ### `SKILL.md`
 
-Embedded in the binary, printed by `elster-cli skill` (same file in the repo). Short and task-shaped: what the tool does and does not do; setup (`eric install`, HerstellerID, Certificate, pointer to config docs); the Postfach loop (`anfrage` → `abholung --out … --bestaetigen`, or `--ohne-bestaetigung` → store → `bestaetigung` within 24 h); the 24 h rule and the HerstellerID block stated plainly; how to react per exit code (retry 6, never retry 5 unchanged, on 7 confirm only what was written, retry `teilweise`); `describe` for reference; the Kontoabfrage.
+Embedded in the binary, printed by `kiecli skill` (same file in the repo). Short and task-shaped: what the tool does and does not do; setup (`eric install`, HerstellerID, Certificate, pointer to config docs); the Postfach loop (`anfrage` → `abholung --out … --bestaetigen`, or `--ohne-bestaetigung` → store → `bestaetigung` within 24 h); the 24 h rule and the HerstellerID block stated plainly; how to react per exit code (retry 6, never retry 5 unchanged, on 7 confirm only what was written, retry `teilweise`); `describe` for reference; the Kontoabfrage.
 
 Checks for the spike added to [Test-system spike: ERiC end to end](11-test-system-spike.md): full Bereitstellungsdatenart list accepted, `neue` vs state 20, error codes for the exit-code mapping.
 

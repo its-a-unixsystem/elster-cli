@@ -1,6 +1,6 @@
 # Rust, with ERiC loaded at runtime through our own binding
 
-elster-cli is written in Rust and binds `libericapi` and `libotto` through its own hand-written `libloading` declarations, not through the existing `eric-bindings`/`eric-sdk` crates. Once ERiC carries all ELSTER traffic, the language choice no longer turns on transport libraries, where Go was ahead; Rust has no runtime of its own that could clash with ERiC in the same process, and v1 targets Linux x86_64 only, which removes Rust's main drawback, the macOS cross-build toolchain. The binding is about 17 functions and two structs; owning it keeps the binary startable without ERiC (so `elster-cli eric install` works on a fresh machine) and lets one release check and accept several ERiC versions at runtime.
+KIECLI is written in Rust and binds `libericapi` and `libotto` through its own hand-written `libloading` declarations, not through the existing `eric-bindings`/`eric-sdk` crates. Once ERiC carries all ELSTER traffic, the language choice no longer turns on transport libraries, where Go was ahead; Rust has no runtime of its own that could clash with ERiC in the same process, and v1 targets Linux x86_64 only, which removes Rust's main drawback, the macOS cross-build toolchain. The binding is about 17 functions and two structs; owning it keeps the binary startable without ERiC (so `kiecli eric install` works on a fresh machine) and lets one release check and accept several ERiC versions at runtime.
 
 ## Considered Options
 
