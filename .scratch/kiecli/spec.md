@@ -41,7 +41,7 @@ Sources: [Go or Rust](issues/08-language.md), [ERiC for the Kontoabfrage](issues
    - `version()`
 
    XML building and parsing live outside the module, in tested code.
-5. **One ERiC session per process:** `EricInitialisiere` once, every ERiC and Otto call on the main thread, `EricBeende` before exit. No `EricMt*`, no threads, no worker process. `EricVersion()` is checked before any other call; a new ERiC major adds a signature variant chosen after that check.
+5. **One ERiC session per process:** `EricInitialisiere` once, every ERiC and Otto call on the main thread, `EricBeende` before exit. No `EricMt*`, no threads, no worker process. `EricVersion()` requires initialization on ERiC 44; check it immediately after initialization, before any application call. A new ERiC major adds a signature variant chosen after that check.
 6. **Blocking, no async runtime.** The `eric install` download uses `ureq` with `rustls` (no system OpenSSL).
 7. **Platform table:** library file names, ERiC package name (`Linux-x86_64`) and the default data directory live in one place, so macOS can be added later without restructuring. Nothing else claims more than Linux x86_64.
 8. **Baseline crates:** `clap` (derive), `serde`, `serde_json`, `quick-xml` with serde, `zip`, `sha2`, `directories`, `thiserror`, `libloading`, `ureq`, `schemars`. Smaller choices are left to the build. Every dependency must be AGPL-3.0-compatible (`cargo deny`).
@@ -198,6 +198,8 @@ kiecli skill
 ### 5.4 `eric status`
 
 Reports the ERiC directory, the version found, whether it is supported (with the supported majors), whether the terms are accepted, the library paths, and the result of the test-load (§3.5). No network, no Certificate.
+
+On exit 4, stdout still carries the status report, with `test_load: false` and `null` for `version` and `supported` if the version could not be read. Stderr carries the error (§8). Linux paths that are not valid UTF-8 use replacement characters in the report; KIECLI uses the original path to access the installation.
 
 ### 5.5 `config show`
 

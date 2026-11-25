@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EricVersion xmlns="http://www.elster.de/EricXML/1.0/EricVersion">
+  <Bibliothek>
+    <Name>libother.so</Name>
+    <Produktversion>98, 1, 2, 3</Produktversion>
+    <Dateiversion>98, 1, 2, 3</Dateiversion>
+  </Bibliothek>
+  <Bibliothek>
+    <Name>libericapi.so</Name>
+    <Produktversion>44, 17, 9, 3</Produktversion>
+    <Dateiversion>44, 17, 11, 1</Dateiversion>
+  </Bibliothek>
+</EricVersion>

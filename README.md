@@ -16,8 +16,19 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-Planning. There is no code yet. The v1 specification is drafted in [`.scratch/kiecli/spec.md`](.scratch/kiecli/spec.md); domain terms are in [`GLOSSARY.md`](GLOSSARY.md) and design decisions in [`docs/adr/`](docs/adr/).
+Implementation has started. The first command, `eric status`, checks a local ERiC installation without a Certificate or a connection to ELSTER. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+
+On Linux x86_64 with `libgcc_s.so.1` installed, unpack the official ERiC 44 package. Read its `lizenz.pdf` and data-protection notice. If you accept the terms, record acceptance next to `lizenz.pdf` and point KIECLI at that directory:
+
+```sh
+touch /path/to/Linux-x86_64/.kiecli-eric-terms-accepted
+cargo run -- eric status --eric-dir /path/to/Linux-x86_64
+```
+
+`--format text` makes the result easier to read. `--eric-log DIR` keeps the diagnostic log; otherwise it is temporary. Use `eric install --accept-eric-terms` to install ERiC once that command ships.
+
+An unusable installation exits with code 4. Stdout still contains the status checks that ran; stderr contains the error. JSON uses `null` for the version and its support status when the version could not be read.
 
 ## Licence
 
-Planned: `AGPL-3.0-only`, with an additional permission to combine the program with ERiC and Otto as published by ELSTER ([ADR 0003](docs/adr/0003-agpl-with-eric-exception.md)).
+`AGPL-3.0-only` ([LICENSE](LICENSE)), with an [additional permission](NOTICE) to combine the program with ERiC and Otto as published by ELSTER.
