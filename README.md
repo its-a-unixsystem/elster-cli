@@ -16,7 +16,7 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-`eric install`, `eric status`, `config show`, `zertifikat status`, and `postfach status|anfrage|abholung|bestaetigung` are available. `zertifikat status` needs a Certificate and PIN; Postfach commands also need a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+`eric install`, `eric status`, `config show`, `zertifikat status`, `postfach status|anfrage|abholung|bestaetigung`, and `kontoabfrage offene-betraege|zahlungen|sollstellungen` are available. `zertifikat status` needs a Certificate and PIN; Postfach and Kontoabfrage commands also need a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
 
 On Linux x86_64 with `libgcc_s.so.1` installed, review `lizenz.pdf` inside the [official ERiC package](https://download.elster.de/download/eric/eric_44/ERiC-44.3.6.0-Linux-x86_64.jar) (a ZIP archive) and the [tax administration's data-protection notice](https://www.elster.de/eportal/helpGlobal?themaGlobal=datenschutz_public#ds_steuerverw). If you accept the terms:
 
@@ -65,6 +65,10 @@ Run `cargo run -- postfach abholung --id ID --out DIR --bestaetigen` to write th
 Use an output directory you own. The CLI refuses Postfach output directories writable by group or others, and does not follow symlinks at Nachricht or Anhang directories.
 
 Use `--ohne-bestaetigung` instead to defer confirmation, then run `cargo run -- postfach bestaetigung --id ID` before the reported `bestaetigung_faellig_bis` (24 hours after collection starts). On exit 7, inspect each Nachricht: a partial Abholung is not confirmed but still has a deadline. Retry that ID; if retries keep failing, confirm before the deadline to avoid ELSTER blocking the HerstellerID. Neither command silently switches into test mode.
+## Querying a tax account
+
+Run `cargo run -- kontoabfrage offene-betraege --profile NAME --steuernummer NUMBER` to query open amounts. `zahlungen` also requires `--ab YYYY-MM-DD`, optionally accepts `--ein-jahr` and repeatable `--steuerart`. `sollstellungen` requires repeatable `--steuerart` and `--jahr`; the request is limited to 75 combinations. Tax types are case-insensitive and amounts are returned as decimal strings. A Bescheid-format Steuernummer requires `--bundesland`; ERiC converts it locally. Kontoabfragen use the live service by default; pass `--test` with a test Certificate to use ELSTER's test system. Add `--mit-xml` to include the raw Kontoabfrage Nutzdaten in the output.
+
 
 ## Continuous integration
 

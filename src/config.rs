@@ -47,6 +47,14 @@ struct ProfileDetails {
     bundesland: Option<String>,
 }
 
+pub(crate) struct TaxpayerNumber {
+    pub(crate) steuernummer: String,
+    pub(crate) bundesland: Option<String>,
+    pub(crate) warnings: Vec<Warning>,
+}
+
+
+
 #[derive(Deserialize)]
 struct CredentialConfig {
     certificate: Option<PathBuf>,
@@ -61,10 +69,10 @@ pub(crate) struct Settings {
     pub(crate) warnings: Vec<Warning>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(crate) struct Warning {
-    code: &'static str,
-    message: &'static str,
+    pub(crate) code: &'static str,
+    pub(crate) message: &'static str,
 }
 
 impl Warning {
@@ -368,6 +376,29 @@ pub(crate) fn request_settings(
     })?;
     let (path, pin) = credentials(cli, &mut layers)?;
     Ok((layers.into_settings(), path, pin, id))
+}
+
+pub(crate) fn taxpayer_number_settings(cli: &Cli) -> Result<TaxpayerNumber, Failure> {
+    let mut layers = Layers::load(cli)?;
+    let mut profile: ProfileDetails = std::mem::take(&mut layers.selected.details)
+        .try_into()
+        .map_err(|_| Failure::new(3, "config_invalid", "Invalid selected profile setting type"))?;
+    let steuernummer = profile_setting(
+        cli.steuernummer.clone(),
+        || read_env("KIECLI_STEUERNUMMER"),
+        profile.steuernummer.take(),
+        "KIECLI_STEUERNUMMER overrides the profile's steuernummer setting",
+        &mut layers.warnings,
+    )?.value.ok_or_else(|| Failure::new(2, "steuernummer_missing", "No Steuernummer was supplied")
+        .help("Set --steuernummer, KIECLI_STEUERNUMMER or steuernummer in the selected profile."))?;
+    let bundesland = profile_setting(
+        cli.bundesland.clone(),
+        || read_env("KIECLI_BUNDESLAND"),
+        profile.bundesland.take(),
+        "KIECLI_BUNDESLAND overrides the profile's bundesland setting",
+        &mut layers.warnings,
+    )?.value;
+    Ok(TaxpayerNumber { steuernummer, bundesland, warnings: layers.warnings })
 }
 
 fn credentials(cli: &Cli, layers: &mut Layers) -> Result<(PathBuf, crate::pin::Pin), Failure> {

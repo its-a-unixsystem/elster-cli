@@ -73,6 +73,12 @@ type ErrorText = unsafe extern "C" fn(c_int, *mut c_void) -> c_int;
 type OpenCertificate = unsafe extern "C" fn(*mut u32, *mut u32, *const c_char) -> c_int;
 type CloseCertificate = unsafe extern "C" fn(u32) -> c_int;
 type CertificateProperties = unsafe extern "C" fn(u32, *const c_char, *mut c_void) -> c_int;
+type MakeElsterStnr = unsafe extern "C" fn(
+    *const c_char,
+    *const c_char,
+    *const c_char,
+    *mut c_void,
+) -> c_int;
 
 #[repr(C)]
 struct Encryption {
@@ -221,6 +227,32 @@ impl Session {
             })
     }
 
+    pub(crate) fn convert_steuernummer(
+        &self,
+        bescheid: &str,
+        landesnummer: &str,
+        bundesfinanzamtsnummer: Option<&str>,
+        trace: &mut Option<Vec<TraceEvent>>,
+    ) -> Result<(String, String), Failure> {
+        let number = CString::new(bescheid).map_err(|_| Failure::new(2, "steuernummer_invalid", "Invalid Steuernummer"))?;
+        let land = CString::new(landesnummer).expect("static ERiC Landesnummer");
+        let bufa = bundesfinanzamtsnummer.map(CString::new).transpose().map_err(|_| Failure::new(2, "steuernummer_invalid", "Invalid Bundesfinanzamtsnummer"))?;
+        let empty = CString::default();
+        // SAFETY: the function signature and parameters are documented in ERiC 44.
+        let convert = unsafe { self.library.get::<MakeElsterStnr>(b"EricMakeElsterStnr\0") }.map_err(symbol_error)?;
+        let buffer = Buffer::new(&self.library)?;
+        let code = timed(trace, "EricMakeElsterStnr", || unsafe {
+            convert(number.as_ptr(), land.as_ptr(), bufa.as_ref().map_or(empty.as_ptr(), |value| value.as_ptr()), buffer.ptr.as_ptr())
+        });
+        if code != 0 {
+            return Err(Failure::new(2, "steuernummer_invalid", "ERiC rejected the Bescheid-format Steuernummer")
+                .eric_cause(code, self.error_text(code)));
+        }
+        let elster = buffer.text().ok_or_else(|| Failure::new(1, "steuernummer_conversion_failed", "ERiC did not return an ELSTER-format Steuernummer"))?.to_owned();
+        let bufa = elster.get(..4).filter(|prefix| prefix.bytes().all(|byte| byte.is_ascii_digit()))
+            .ok_or_else(|| Failure::new(1, "steuernummer_conversion_failed", "ERiC returned an invalid ELSTER-format Steuernummer"))?.to_owned();
+        Ok((elster, bufa))
+    }
     fn open_certificate(&self, path: &Path) -> Result<Certificate<'_>, Failure> {
         let path = c_path(path)?;
         // SAFETY: the checked ERiC 44 ABI uses these handle functions.

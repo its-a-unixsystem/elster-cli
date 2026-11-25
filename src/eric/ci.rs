@@ -142,6 +142,19 @@ fn validates_placeholder_hersteller_id_offline() {
 }
 
 #[test]
+#[ignore = "requires official ERiC 44; does not contact ELSTER"]
+fn converts_a_bescheid_steuernummer_offline() {
+    with_session(|session| {
+        let mut trace = None;
+        let (number, bufa) = session
+            .convert_steuernummer("199/262/11407", "09", None, &mut trace)
+            .unwrap_or_else(fail);
+        assert_eq!(number, "9199026211407");
+        assert_eq!(bufa, "9199");
+    });
+}
+
+#[test]
 #[ignore = "one-off read-only ELSTER test-system request; requires official ERiC and test Certificate"]
 fn elster_test_system_is_reachable() {
     let since = env::var("KIECLI_TEST_POSTFACH_SINCE").expect("KIECLI_TEST_POSTFACH_SINCE");

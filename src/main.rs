@@ -7,6 +7,7 @@ mod eric;
 mod error;
 mod pin;
 mod postfach;
+mod kontoabfrage;
 mod version;
 
 use std::io::{self, Write};
@@ -56,6 +57,8 @@ struct Cli {
     /// Bundesland for a Bescheid-format Steuernummer.
     #[arg(long, global = true)]
     bundesland: Option<String>,
+    #[arg(long, global = true)]
+    mit_xml: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -88,6 +91,10 @@ enum Command {
     Postfach {
         #[command(subcommand)]
         command: postfach::Command,
+    },
+    Kontoabfrage {
+        #[command(subcommand)]
+        command: kontoabfrage::Command,
     },
 }
 
@@ -184,6 +191,7 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
             command: CertificateCommand::Status,
         } => certificate::status(cli, stdout),
         Command::Postfach { command } => postfach::run(cli, command, stdout),
+        Command::Kontoabfrage { command } => kontoabfrage::run(cli, command, stdout),
     }
 }
 

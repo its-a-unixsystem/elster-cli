@@ -73,6 +73,7 @@ jobs:
           KIECLI_TEST_ERIC_HOME: ${{ steps.eric.outputs.home }}
         run: |
           cargo test --locked --test eric_status reports_the_loaded_library_version_offline -- --ignored --exact
+          cargo test --locked --bin kiecli eric::ci::converts_a_bescheid_steuernummer_offline -- --ignored --exact
           cargo test --locked --bin kiecli eric::install::tests::extracts_only_linux_and_activates_after_a_real_test_load -- --ignored --exact
           cargo test --locked --bin kiecli eric::ci::validates_placeholder_hersteller_id_offline -- --ignored --exact
           tmp=$(mktemp -d)
@@ -204,3 +205,25 @@ jobs:
             (.postfach_nachrichten | length == 1 and
              .[0].id == $id and .[0].bestaetigt and .[0].rueckgabe.code == 0)' \
             "$tmp/bestaetigung.json" > /dev/null
+          run_kontoabfrage() {
+            local name=$1
+            shift
+            local stdout="$tmp/kontoabfrage-${name}.stdout"
+            local stderr="$tmp/kontoabfrage-${name}.stderr"
+            set +e
+            target/debug/kiecli "$@" >"$stdout" 2>"$stderr"
+            local status=$?
+            set -e
+            [[ "$status" == 5 && ! -s "$stdout" ]] || {
+              echo "Kontoabfrage ${name} did not return the expected authorization result." >&2
+              exit 1
+            }
+            jq -e '(.error.cause | any(.code == 230077012))' "$stderr" >/dev/null || {
+              echo "Kontoabfrage ${name} returned an unexpected structured error." >&2
+              exit 1
+            }
+          }
+          # 9238 is the documented test Finanzamt; response data stays in mode-077 files.
+          run_kontoabfrage offene kontoabfrage offene-betraege --test --steuernummer 9238020010101
+          run_kontoabfrage zahlungen kontoabfrage zahlungen --test --steuernummer 9238020010101 --ab 2026-01-02
+          run_kontoabfrage sollstellungen kontoabfrage sollstellungen --test --steuernummer 9238020010101 --steuerart ESt --jahr 2025
