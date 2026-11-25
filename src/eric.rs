@@ -29,7 +29,7 @@ const TERMS_MARKER: &str = ".kiecli-eric-terms-accepted";
 const ACTIVE_LINK: &str = ".kiecli-eric-current";
 const VERSIONS_DIR: &str = "versions";
 const INSTALL_HELP: &str = "Use 'kiecli eric install --accept-eric-terms' or follow the manual setup in the KIECLI README.";
-const LOG_NOTE: &str = "Use --eric-log DIR to keep ERiC diagnostics.";
+pub(crate) const LOG_NOTE: &str = "Use --eric-log DIR to keep ERiC diagnostics.";
 pub(crate) const SUPPORTED_MAJORS: &[u16] = &[44];
 
 #[derive(Serialize)]
@@ -67,10 +67,25 @@ type BufferContent = unsafe extern "C" fn(*mut c_void) -> *const c_char;
 type BufferFree = unsafe extern "C" fn(*mut c_void) -> c_int;
 type Version = unsafe extern "C" fn(*mut c_void) -> c_int;
 type ErrorText = unsafe extern "C" fn(c_int, *mut c_void) -> c_int;
+type OpenCertificate = unsafe extern "C" fn(*mut u32, *mut u32, *const c_char) -> c_int;
+type CloseCertificate = unsafe extern "C" fn(u32) -> c_int;
+type CertificateProperties = unsafe extern "C" fn(u32, *const c_char, *mut c_void) -> c_int;
 
-struct Session {
+pub(crate) struct Session {
     library: Library,
     end: Option<End>,
+}
+
+struct Certificate<'lib> {
+    handle: u32,
+    close: Symbol<'lib, CloseCertificate>,
+}
+
+impl Drop for Certificate<'_> {
+    fn drop(&mut self) {
+        // SAFETY: this is the unique handle owner and the library is still loaded.
+        unsafe { (self.close)(self.handle) };
+    }
 }
 
 struct Buffer<'lib> {
@@ -181,6 +196,98 @@ impl Session {
             })
     }
 
+    fn open_certificate(&self, path: &Path) -> Result<Certificate<'_>, Failure> {
+        let path = c_path(path)?;
+        // SAFETY: the checked ERiC 44 ABI uses these handle functions.
+        let open = unsafe {
+            self.library
+                .get::<OpenCertificate>(b"EricGetHandleToCertificate\0")
+        }
+        .map_err(symbol_error)?;
+        // SAFETY: the checked ERiC 44 ABI uses these handle functions.
+        let close = unsafe {
+            self.library
+                .get::<CloseCertificate>(b"EricCloseHandleToCertificate\0")
+        }
+        .map_err(symbol_error)?;
+        let (mut handle, mut pin_support) = (0, 0);
+        // SAFETY: both output pointers and the NUL-terminated path are live.
+        let code = unsafe { open(&mut handle, &mut pin_support, path.as_ptr()) };
+        if code != 0 {
+            return Err(self.certificate_error(code));
+        }
+        Ok(Certificate { handle, close })
+    }
+}
+
+pub(crate) trait CertificateReader {
+    fn inspect_certificate<T>(
+        &self,
+        path: &Path,
+        pin: &crate::pin::Pin,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(&str) -> Result<T, Failure>,
+    ) -> Result<T, Failure>;
+}
+
+impl CertificateReader for Session {
+    fn inspect_certificate<T>(
+        &self,
+        path: &Path,
+        pin: &crate::pin::Pin,
+        trace: &mut Option<Vec<TraceEvent>>,
+        parse: impl FnOnce(&str) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        let cert = timed(trace, "EricGetHandleToCertificate", || {
+            self.open_certificate(path)
+        })?;
+        // SAFETY: this is the ERiC 44 certificate properties ABI.
+        let properties = unsafe {
+            self.library
+                .get::<CertificateProperties>(b"EricHoleZertifikatEigenschaften\0")
+        }
+        .map_err(symbol_error)?;
+        let buffer = Buffer::new(&self.library)?;
+        let code = timed(trace, "EricHoleZertifikatEigenschaften", || {
+            // SAFETY: the certificate, PIN and buffer are live for this synchronous call.
+            unsafe { properties(cert.handle, pin.as_c_str().as_ptr(), buffer.ptr.as_ptr()) }
+        });
+        timed(trace, "EricCloseHandleToCertificate", || drop(cert));
+        if code != 0 {
+            return Err(self.certificate_error(code));
+        }
+        parse(buffer.text().ok_or_else(|| {
+            Failure::new(
+                1,
+                "certificate_properties_invalid",
+                "ERiC did not return Certificate properties",
+            )
+            .note(LOG_NOTE)
+        })?)
+    }
+}
+
+impl Session {
+    fn certificate_error(&self, code: c_int) -> Failure {
+        let (exit, code_name, message) = match code {
+            610201106 => (3, "pin_wrong", "The Certificate PIN is incorrect"),
+            610201107 => (3, "pin_locked", "The Certificate PIN is locked"),
+            610201101..=610201212 => (
+                3,
+                "certificate_unreadable",
+                "ERiC could not open the Certificate",
+            ),
+            _ => (
+                1,
+                "certificate_inspection_failed",
+                "ERiC could not inspect the Certificate",
+            ),
+        };
+        Failure::new(exit, code_name, message)
+            .eric_cause(code, self.error_text(code))
+            .note(LOG_NOTE)
+    }
+
     fn error_text(&self, code: c_int) -> Option<String> {
         // SAFETY: the signature matches ERiC's error-text entry point.
         let describe = unsafe { self.library.get::<ErrorText>(b"EricHoleFehlerText\0") }.ok()?;
@@ -234,6 +341,15 @@ impl Probe {
     }
 
     pub(crate) fn check(&mut self, dir: &Path, log_dir: Option<&Path>) -> Result<(), Failure> {
+        self.with_session(dir, log_dir, |_, _| Ok(()))
+    }
+
+    pub(crate) fn with_session<T>(
+        &mut self,
+        dir: &Path,
+        log_dir: Option<&Path>,
+        run: impl FnOnce(&Session, &mut Option<Vec<TraceEvent>>) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
         let marker = dir.join(TERMS_MARKER);
         self.terms_accepted = marker.is_file();
         require_library(&self.library_paths.eric)?;
@@ -289,7 +405,11 @@ impl Probe {
         timed(&mut self.trace, "load Otto", || {
             check_otto(&self.library_paths.otto)
         })?;
-        timed(&mut self.trace, "EricBeende", || session.finish())
+        let result = run(&session, &mut self.trace);
+        let finished = timed(&mut self.trace, "EricBeende", || session.finish());
+        let value = result?;
+        finished?;
+        Ok(value)
     }
 }
 

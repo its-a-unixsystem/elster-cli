@@ -21,14 +21,15 @@ pub(crate) struct Failure {
     #[serde(skip_serializing_if = "Option::is_none")]
     help: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    cause: Option<Box<[EricCause; 1]>>,
+    cause: Option<Box<[Cause; 1]>>,
     retry: bool,
 }
 
 #[derive(Serialize)]
-struct EricCause {
+struct Cause {
     source: &'static str,
-    code: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
 }
@@ -63,8 +64,17 @@ impl Failure {
     }
 
     pub(crate) fn eric_cause(mut self, code: i32, text: Option<String>) -> Self {
-        self.cause = Some(Box::new([EricCause {
+        self.cause = Some(Box::new([Cause {
             source: "eric",
+            code: Some(code),
+            text,
+        }]));
+        self
+    }
+
+    pub(crate) fn pin_command_cause(mut self, code: Option<i32>, text: Option<String>) -> Self {
+        self.cause = Some(Box::new([Cause {
+            source: "pin_command",
             code,
             text,
         }]));
@@ -85,7 +95,10 @@ impl Failure {
             writeln!(out, "= help: {help}")?;
         }
         if let Some([cause]) = self.cause.as_deref() {
-            write!(out, "= note: {} returned {}", cause.source, cause.code)?;
+            write!(out, "= note: {}", cause.source)?;
+            if let Some(code) = cause.code {
+                write!(out, " returned {code}")?;
+            }
             if let Some(text) = &cause.text {
                 write!(out, ": {text}")?;
             }

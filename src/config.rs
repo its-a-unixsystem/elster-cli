@@ -41,11 +41,17 @@ struct Profile {
 
 #[derive(Deserialize)]
 struct ProfileDetails {
+    #[serde(flatten)]
+    credentials: CredentialConfig,
+    steuernummer: Option<String>,
+    bundesland: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CredentialConfig {
     certificate: Option<PathBuf>,
     pin_file: Option<PathBuf>,
     pin_command: Option<String>,
-    steuernummer: Option<String>,
-    bundesland: Option<String>,
 }
 
 pub(crate) struct Settings {
@@ -62,6 +68,10 @@ pub(crate) struct Warning {
 }
 
 impl Warning {
+    pub(crate) fn new(code: &'static str, message: &'static str) -> Self {
+        Self { code, message }
+    }
+
     pub(crate) fn write_text(&self, mut out: impl Write) -> io::Result<()> {
         writeln!(out, "warning[{}]: {}", self.code, self.message)
     }
@@ -204,6 +214,55 @@ impl Layers {
             warnings,
         })
     }
+
+    fn certificate(
+        &mut self,
+        cli: &Cli,
+        profile: Option<PathBuf>,
+    ) -> Result<Resolved<Option<PathBuf>>, Failure> {
+        let mut certificate = profile_setting(
+            cli.certificate.clone(),
+            || Ok(env_path("KIECLI_CERTIFICATE")),
+            profile,
+            "KIECLI_CERTIFICATE overrides the profile's certificate setting",
+            &mut self.warnings,
+        )?;
+        if let Some(path) = &certificate.value {
+            certificate.value = Some(resolve_path(
+                path,
+                self.base.as_ref().map(BaseDirs::home_dir),
+                relative_to(certificate.source, &self.config),
+            )?);
+        }
+        Ok(certificate)
+    }
+
+    fn pin(
+        &mut self,
+        cli: &Cli,
+        profile: CredentialConfig,
+    ) -> Result<Resolved<Option<crate::pin::Source>>, Failure> {
+        let pin_source = |file: Option<PathBuf>, command: Option<String>| {
+            file.map(crate::pin::Source::File)
+                .or_else(|| command.map(|value| crate::pin::Source::Command(value.into())))
+        };
+        profile_setting(
+            pin_source(cli.pin_file.clone(), cli.pin_command.clone()),
+            || Ok(crate::pin::Source::environment()),
+            pin_source(profile.pin_file, profile.pin_command),
+            "The PIN environment setting overrides the profile's pin_file or pin_command setting",
+            &mut self.warnings,
+        )
+    }
+
+    fn into_settings(self) -> Settings {
+        Settings {
+            eric_dir: self.eric_dir.value,
+            profile: self.profile.value,
+            test: self.test.value,
+            warnings: self.warnings,
+        }
+    }
 }
 
 fn env_path(key: &str) -> Option<PathBuf> {
@@ -254,13 +313,56 @@ fn profile_setting<T>(
 }
 
 pub(crate) fn resolve(cli: &Cli) -> Result<Settings, Failure> {
-    let layers = Layers::load(cli)?;
-    Ok(Settings {
-        eric_dir: layers.eric_dir.value,
-        profile: layers.profile.value,
-        test: layers.test.value,
-        warnings: layers.warnings,
-    })
+    Ok(Layers::load(cli)?.into_settings())
+}
+
+pub(crate) fn certificate_settings(
+    cli: &Cli,
+) -> Result<(Settings, PathBuf, crate::pin::Pin), Failure> {
+    let mut layers = Layers::load(cli)?;
+    let mut credentials: CredentialConfig = std::mem::take(&mut layers.selected.details)
+        .try_into()
+        .map_err(|_| {
+            Failure::new(
+                3,
+                "config_invalid",
+                "Invalid Certificate or PIN setting type",
+            )
+        })?;
+    let certificate = layers
+        .certificate(cli, credentials.certificate.take())?
+        .value
+        .ok_or_else(|| {
+            Failure::new(
+                3,
+                "certificate_not_found",
+                "No Certificate path was supplied",
+            )
+            .note("Set --certificate, KIECLI_CERTIFICATE or certificate in the profile.")
+        })?;
+    if !certificate.is_file() || fs::File::open(&certificate).is_err() {
+        return Err(Failure::new(
+            3,
+            "certificate_not_found",
+            format!(
+                "Certificate '{}' is not a readable file",
+                certificate.display()
+            ),
+        ));
+    }
+    let pin = layers.pin(cli, credentials)?;
+    let pin = match pin.value {
+        Some(crate::pin::Source::File(path)) => crate::pin::Source::File(resolve_path(
+            &path,
+            layers.base.as_ref().map(BaseDirs::home_dir),
+            relative_to(pin.source, &layers.config),
+        )?),
+        Some(source) => source,
+        None => return Err(Failure::new(3, "pin_missing", "No Certificate PIN was supplied")
+            .note("Set KIECLI_PIN, or use a PIN file (--pin-file, KIECLI_PIN_FILE, pin_file) or a PIN command (--pin-command, KIECLI_PIN_COMMAND, pin_command).")),
+    };
+    let pin = pin.read(&mut layers.warnings)?;
+    Ok((layers.into_settings(), certificate, pin))
 }
 
 pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
@@ -272,20 +374,11 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
             "Invalid HerstellerID or selected profile setting type in the config file",
         )
     };
-    let profile: ProfileDetails = layers.selected.details.try_into().map_err(|_| invalid())?;
-    let home = layers.base.as_ref().map(BaseDirs::home_dir);
-    let certificate = profile_setting(
-        cli.certificate.clone(),
-        || Ok(env_path("KIECLI_CERTIFICATE")),
-        profile.certificate,
-        "KIECLI_CERTIFICATE overrides the profile's certificate setting",
-        &mut layers.warnings,
-    )?;
-    let certificate_path = certificate
-        .value
-        .as_deref()
-        .map(|path| resolve_path(path, home, relative_to(certificate.source, &layers.config)))
-        .transpose()?;
+    let mut profile: ProfileDetails = std::mem::take(&mut layers.selected.details)
+        .try_into()
+        .map_err(|_| invalid())?;
+    let certificate = layers.certificate(cli, profile.credentials.certificate.take())?;
+    let pin = layers.pin(cli, profile.credentials)?;
     let steuernummer = profile_setting(
         cli.steuernummer.clone(),
         || read_env("KIECLI_STEUERNUMMER"),
@@ -321,21 +414,7 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
         )
         .help("Set --hersteller-id, KIECLI_HERSTELLER_ID or hersteller_id in the config file."));
     }
-    let pin = profile_setting(
-        pin_channel(cli.pin_file.is_some(), cli.pin_command.is_some()),
-        || {
-            Ok(if env::var_os("KIECLI_PIN").is_some() {
-                Some("env")
-            } else if env::var_os("KIECLI_PIN_FILE").is_some() {
-                Some("file")
-            } else {
-                env::var_os("KIECLI_PIN_COMMAND").map(|_| "command")
-            })
-        },
-        pin_channel(profile.pin_file.is_some(), profile.pin_command.is_some()),
-        "The PIN environment setting overrides the profile's pin_file or pin_command setting",
-        &mut layers.warnings,
-    )?;
+    let pin_channel = pin.value.as_ref().map(crate::pin::Source::channel);
 
     let file_source = layers
         .config
@@ -360,10 +439,10 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
             source(layers.eric_dir.source),
         ),
         certificate: Shown::new(
-            certificate_path.as_deref().map(Path::to_string_lossy),
+            certificate.value.as_deref().map(Path::to_string_lossy),
             source(certificate.source),
         ),
-        pin: Shown::new(pin.value, source(pin.source)),
+        pin: Shown::new(pin_channel, source(pin.source)),
         hersteller_id: Shown::new(hersteller_id.value.as_deref(), source(hersteller_id.source)),
         steuernummer: Shown::new(steuernummer.value.as_deref(), source(steuernummer.source)),
         bundesland: Shown::new(bundesland.value.as_deref(), source(bundesland.source)),
@@ -379,16 +458,6 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
         Format::Text => report.write_text(&mut out),
     }
     .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
-}
-
-fn pin_channel(file: bool, command: bool) -> Option<&'static str> {
-    if file {
-        Some("file")
-    } else if command {
-        Some("command")
-    } else {
-        None
-    }
 }
 
 #[derive(Serialize)]

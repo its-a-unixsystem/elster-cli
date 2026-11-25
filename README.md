@@ -16,7 +16,7 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-`eric install`, `eric status`, and `config show` are available. None needs a Certificate or HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+`eric install`, `eric status`, `config show`, and `zertifikat status` are available. Only `zertifikat status` needs a Certificate and PIN; none needs a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
 
 On Linux x86_64 with `libgcc_s.so.1` installed, review `lizenz.pdf` inside the [official ERiC package](https://download.elster.de/download/eric/eric_44/ERiC-44.3.6.0-Linux-x86_64.jar) (a ZIP archive) and the [tax administration's data-protection notice](https://www.elster.de/eportal/helpGlobal?themaGlobal=datenschutz_public#ds_steuerverw). If you accept the terms:
 
@@ -43,6 +43,12 @@ An unusable installation exits with code 4. Stdout still contains the status che
 Run `cargo run -- config show [--profile NAME]` to see the effective settings without loading ERiC, opening the Certificate, or reading a PIN file or running a PIN command. Settings come from flags, `KIECLI_*` environment variables, the [TOML config file](.scratch/kiecli/spec.md#4-configuration-and-secrets), and defaults, in that order.
 
 JSON reports settings as `{"value": ..., "source": ...}`. The common `profile` and `test` fields keep their usual types and use `profile_source` and `test_source`. For `pin`, the value is only the channel (`env`, `file`, `command`, or `null`), never the PIN, file path, or command. Within a layer, direct PIN environment input takes precedence over a PIN file, then a PIN command. The two PIN flags are mutually exclusive.
+
+## Inspecting a Certificate
+
+Run `cargo run -- zertifikat status --profile NAME` with Certificate and PIN settings in the profile, or supply `--certificate PATH --pin-file PATH`. This opens the Certificate locally with ERiC and sends nothing to ELSTER. JSON includes the validity dates, the Konto-ID, and whether this is an Organisationszertifikat or a test Certificate. Expired and not-yet-valid Certificates are reported with a warning and exit 0; a wrong or locked PIN exits 3.
+
+PINs can also come from `KIECLI_PIN` or a non-interactive `--pin-command`. The command must write the PIN only to stdout; stderr is for non-secret diagnostics. If the command fails without providing a PIN to redact, KIECLI reports the failure without forwarding its stderr.
 
 ## Continuous integration
 

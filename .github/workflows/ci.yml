@@ -68,6 +68,11 @@ jobs:
           cargo test --locked --test eric_status reports_the_loaded_library_version_offline -- --ignored --exact
           cargo test --locked --bin kiecli eric::install::tests::extracts_only_linux_and_activates_after_a_real_test_load -- --ignored --exact
           cargo test --locked --bin kiecli eric::ci::validates_placeholder_hersteller_id_offline -- --ignored --exact
+          tmp=$(mktemp -d)
+          trap 'rm -rf -- "$tmp"' EXIT
+          export KIECLI_TEST_CERTIFICATE="$tmp/test-softorg-pse.pfx"
+          bash .github/scripts/download-test-certificate.sh "$KIECLI_TEST_CERTIFICATE"
+          cargo test --locked --test certificate_status inspects_an_official_test_certificate_offline -- --ignored --exact
 
   # Remove this job once a hosted runner has received the expected ELSTER reply.
   elster-reachability:
@@ -85,14 +90,10 @@ jobs:
         env:
           KIECLI_TEST_ERIC_HOME: ${{ steps.eric.outputs.home }}
         run: |
-          umask 077
           tmp=$(mktemp -d)
           trap 'rm -rf -- "$tmp"' EXIT
-          read -r url sha256 <<< "$(python3 -c 'import tomllib; c = tomllib.load(open("tests/downloads.toml", "rb"))["test_certificate"]; print(c["url"], c["sha256"])')"
-          curl --proto '=https' --fail --silent --show-error --max-time 60 --output "$tmp/certs.zip" -- "$url"
-          printf '%s  %s\n' "$sha256" "$tmp/certs.zip" | sha256sum --check
-          unzip -p "$tmp/certs.zip" test-softorg-pse.pfx > "$tmp/test-softorg-pse.pfx"
           export KIECLI_TEST_CERTIFICATE="$tmp/test-softorg-pse.pfx"
+          bash .github/scripts/download-test-certificate.sh "$KIECLI_TEST_CERTIFICATE"
           KIECLI_TEST_POSTFACH_SINCE=$(date -u -d yesterday +%Y%m%d)
           export KIECLI_TEST_POSTFACH_SINCE
           cargo test --locked --bin kiecli eric::ci::elster_test_system_is_reachable -- --ignored --exact

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
+mod certificate;
 mod config;
 mod eric;
 mod error;
+mod pin;
 mod version;
 
 use std::io::{self, Write};
@@ -76,6 +78,11 @@ enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    /// Inspect a local ELSTER Certificate.
+    Zertifikat {
+        #[command(subcommand)]
+        command: CertificateCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -90,6 +97,12 @@ enum EricCommand {
 enum ConfigCommand {
     /// Show effective settings and their sources without using credentials.
     Show,
+}
+
+#[derive(Subcommand)]
+enum CertificateCommand {
+    /// Open a Certificate with its PIN without contacting ELSTER.
+    Status,
 }
 
 #[derive(Serialize)]
@@ -161,6 +174,9 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
         Command::Config {
             command: ConfigCommand::Show,
         } => config::show(cli, stdout),
+        Command::Zertifikat {
+            command: CertificateCommand::Status,
+        } => certificate::status(cli, stdout),
     }
 }
 

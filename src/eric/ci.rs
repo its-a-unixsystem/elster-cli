@@ -3,13 +3,12 @@
 
 use std::env;
 use std::ffi::{CString, c_char, c_int, c_void};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::ptr;
 
-use libloading::Symbol;
 use serde::Deserialize;
 
-use super::{Buffer, ERIC_LIB, Session, TERMS_MARKER, c_path, load};
+use super::{Buffer, Certificate, ERIC_LIB, Session, TERMS_MARKER, load};
 use crate::error::Failure;
 
 const VALIDATE: u32 = 1 << 1;
@@ -22,8 +21,6 @@ struct Encryption {
     pin: *const c_char,
 }
 
-type OpenCertificate = unsafe extern "C" fn(*mut u32, *mut u32, *const c_char) -> c_int;
-type CloseCertificate = unsafe extern "C" fn(u32) -> c_int;
 type Process = unsafe extern "C" fn(
     *const c_char,
     *const c_char,
@@ -33,42 +30,6 @@ type Process = unsafe extern "C" fn(
     *mut c_void,
     *mut c_void,
 ) -> c_int;
-
-struct TestCertificate<'lib> {
-    handle: u32,
-    close: Symbol<'lib, CloseCertificate>,
-}
-
-impl<'lib> TestCertificate<'lib> {
-    fn open(session: &'lib Session, path: &Path) -> Self {
-        let path = c_path(path).unwrap_or_else(fail);
-        // SAFETY: these are the ERiC 44 certificate-handle ABI signatures.
-        let (open, close) = unsafe {
-            (
-                session
-                    .library
-                    .get::<OpenCertificate>(b"EricGetHandleToCertificate\0"),
-                session
-                    .library
-                    .get::<CloseCertificate>(b"EricCloseHandleToCertificate\0"),
-            )
-        };
-        let open = open.expect("EricGetHandleToCertificate");
-        let close = close.expect("EricCloseHandleToCertificate");
-        let (mut handle, mut pin_support) = (0, 0);
-        // SAFETY: both output pointers and the NUL-terminated path are live for the call.
-        let code = unsafe { open(&mut handle, &mut pin_support, path.as_ptr()) };
-        assert_eq!(code, 0, "EricGetHandleToCertificate failed");
-        Self { handle, close }
-    }
-}
-
-impl Drop for TestCertificate<'_> {
-    fn drop(&mut self) {
-        // SAFETY: this is the unique handle owner; the session still lives.
-        unsafe { (self.close)(self.handle) };
-    }
-}
 
 fn fail<T>(failure: Failure) -> T {
     panic!(
@@ -97,7 +58,7 @@ fn postfach_status(
     session: &Session,
     since: &str,
     hersteller_id: &str,
-    certificate: Option<&TestCertificate<'_>>,
+    certificate: Option<&Certificate<'_>>,
 ) -> (c_int, Option<u32>) {
     assert!(since.len() == 8 && since.bytes().all(|byte| byte.is_ascii_digit()));
     // 700000004 is valid locally but deliberately rejected by ELSTER through ERiC.
@@ -193,7 +154,7 @@ fn elster_test_system_is_reachable() {
     let cert =
         PathBuf::from(env::var_os("KIECLI_TEST_CERTIFICATE").expect("KIECLI_TEST_CERTIFICATE"));
     with_session(|session| {
-        let cert = TestCertificate::open(session, &cert);
+        let cert = session.open_certificate(&cert).unwrap_or_else(fail);
         assert_eq!(
             postfach_status(session, &since, "12345", Some(&cert)),
             (610101210, Some(601015001)),
