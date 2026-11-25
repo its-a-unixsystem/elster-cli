@@ -58,18 +58,19 @@ fn postfach_status(
 </Nutzdatenblock></DatenTeil>
 </Elster>"#
     )).expect("NUL-free probe XML");
-    process_status(session, &xml, certificate)
+    process_request(session, &xml, c"PostfachStatus_32", certificate)
 }
 
-fn process_status(
+fn process_request(
     session: &Session,
     xml: &std::ffi::CStr,
+    version: &std::ffi::CStr,
     certificate: Option<&Certificate<'_>>,
 ) -> (i32, Option<u32>) {
     session
         .process(
             xml,
-            c"PostfachStatus_32",
+            version,
             certificate.map(|cert| (cert, c"123456")),
             &mut None,
             |code, server, _| Ok((code, server_code(server))),
@@ -111,8 +112,23 @@ fn validates_placeholder_hersteller_id_offline() {
         let valid = CString::new(golden).unwrap();
         let blocked =
             CString::new(golden.replace("<HerstellerID>12345", "<HerstellerID>74931")).unwrap();
-        assert_eq!(process_status(session, &valid, None), (0, None));
-        assert_eq!(process_status(session, &blocked, None), (610301202, None),);
+        assert_eq!(
+            process_request(session, &valid, c"PostfachStatus_32", None),
+            (0, None)
+        );
+        assert_eq!(
+            process_request(session, &blocked, c"PostfachStatus_32", None),
+            (610301202, None),
+        );
+
+        let anfrage = CString::new(include_str!(
+            "../../tests/fixtures/requests/postfach-anfrage.xml"
+        ))
+        .unwrap();
+        assert_eq!(
+            process_request(session, &anfrage, c"PostfachAnfrage_32", None),
+            (0, None)
+        );
     });
 }
 

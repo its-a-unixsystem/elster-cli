@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
+mod anfrage;
+
 #[cfg(test)]
 mod tests;
 
@@ -21,14 +23,16 @@ const TEST_CERTIFICATE_REQUIRES_TESTMERKER: &str = "test_certificate_requires_te
 pub(crate) enum Command {
     /// Show ELSTER's Postfach counts as a hint; ELSTER may omit some kinds.
     Status(Options),
+    /// List Postfach metadata without collecting or confirming Nachrichten.
+    Anfrage(Options),
 }
 
 #[derive(Args)]
 pub(crate) struct Options {
-    /// Show only this Bereitstellungsdatenart (repeatable, case-sensitive).
+    /// Include only this Bereitstellungsdatenart (repeatable, case-sensitive).
     #[arg(long, value_name = "NAME")]
     datenart: Vec<String>,
-    /// Count only Nachrichten not yet confirmed (default).
+    /// Include only Nachrichten not yet confirmed (default).
     #[arg(long, conflicts_with = "alle")]
     neue: bool,
     /// Include already confirmed Nachrichten.
@@ -40,6 +44,28 @@ pub(crate) struct Options {
     /// Include Nachrichten through this date (YYYY-MM-DD).
     #[arg(long, value_name = "DATE", value_parser = parse_date)]
     bis: Option<Date>,
+}
+
+#[derive(Clone, Copy)]
+enum Operation {
+    Status,
+    Anfrage,
+}
+
+impl Operation {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Status => "status",
+            Self::Anfrage => "anfrage",
+        }
+    }
+
+    fn datenart(self) -> &'static str {
+        match self {
+            Self::Status => "PostfachStatus",
+            Self::Anfrage => "PostfachAnfrage",
+        }
+    }
 }
 
 // Accepted through ERiC for Datenabholung version 32; see the test-system spike.
@@ -131,6 +157,7 @@ impl Options {
     fn correction(
         &self,
         cli: &Cli,
+        operation: Operation,
         datenart: Option<(usize, &str)>,
         enable_test: bool,
     ) -> Option<String> {
@@ -138,7 +165,7 @@ impl Options {
         if cli.pin_command.is_some() {
             return None;
         }
-        let mut command = String::from("kiecli postfach status");
+        let mut command = format!("kiecli postfach {}", operation.command());
         if self.alle {
             command.push_str(" --alle");
         }
@@ -208,7 +235,7 @@ fn append_arg(command: &mut String, flag: &str, value: &str) -> Option<()> {
 }
 
 impl Scope {
-    fn new(cli: &Cli, options: &Options) -> Result<Self, Failure> {
+    fn new(cli: &Cli, options: &Options, operation: Operation) -> Result<Self, Failure> {
         if matches!((options.von, options.bis), (Some(von), Some(bis)) if von > bis) {
             return Err(Failure::new(
                 2,
@@ -238,13 +265,15 @@ impl Scope {
                 .note("Bereitstellungsdatenart names are case-sensitive")
                 .help(format!("Did you mean `{suggestion}`? Replace that --datenart value in your original command."));
                 return Err(
-                    match options.correction(cli, Some((index, suggestion)), false) {
+                    match options.correction(cli, operation, Some((index, suggestion)), false) {
                         Some(command) => failure.suggestion(command),
                         None => failure,
                     },
                 );
             };
-            datenarten.push(known);
+            if !datenarten.contains(&known) {
+                datenarten.push(known);
+            }
         }
         Ok(Self {
             einschraenkung: if options.neue || !options.alle {
@@ -258,54 +287,45 @@ impl Scope {
         })
     }
 
-    fn execute(
-        &self,
+    fn preflight(
         eric: &impl AuthenticatedEric,
-        hersteller_id: &str,
         test: bool,
         warnings: &mut Vec<config::Warning>,
         now: OffsetDateTime,
         trace: &mut Option<Vec<TraceEvent>>,
-    ) -> Result<Vec<Count>, Failure> {
+    ) -> Result<(), Failure> {
         eric.inspect(trace, |xml| {
             if certificate::check_for_request(xml, now, warnings)? && !test {
                 return Err(test_certificate_error());
             }
             Ok(())
-        })?;
-        let xml = CString::new(status_request(
-            hersteller_id,
-            test.then_some("700000001"),
-            self.einschraenkung,
-            self.von,
-            self.bis,
-        ))
-        .expect("NUL-free PostfachStatus XML");
+        })
+    }
+
+    fn execute(
+        &self,
+        eric: &impl AuthenticatedEric,
+        hersteller_id: &str,
+        test: bool,
+        trace: &mut Option<Vec<TraceEvent>>,
+    ) -> Result<Vec<Count>, Failure> {
+        let xml = self.request(Operation::Status, hersteller_id, test, None);
         eric.send(&xml, c"PostfachStatus_32", trace, |code, xml, text| {
             self.read(code, xml, text)
         })
     }
 
-    fn read(&self, code: i32, xml: &str, mut text: Option<String>) -> Result<Vec<Count>, Failure> {
-        if code != 0 {
-            if let Some(failure) = decode_rejection(xml, code, &mut text) {
-                return Err(failure);
-            }
-            return Err(eric_failure(code, text));
-        }
-        let reply = quick_xml::de::from_str::<Reply<Payload>>(xml)
-            .map_err(|_| decode_rejection(xml, code, &mut text).unwrap_or_else(invalid_reply))?;
-        if let Some(failure) = reply.rejection(code, &mut text) {
-            return Err(failure);
-        }
-        let blocks = reply.data.ok_or_else(invalid_reply)?.blocks;
+    fn read(&self, code: i32, xml: &str, text: Option<String>) -> Result<Vec<Count>, Failure> {
+        let operation = Operation::Status;
+        let reply = operation.read_reply::<Payload>(code, xml, text)?;
+        let blocks = reply.data.ok_or_else(|| operation.invalid_reply())?.blocks;
         let mut counts = Vec::new();
         let mut answered = false;
         for block in blocks {
             for answer in block.payload.into_iter().flat_map(|p| p.collection.status) {
                 let effective = answer.scope.unwrap_or(Einschraenkung::Alle);
                 if effective != self.einschraenkung {
-                    return Err(invalid_reply());
+                    return Err(operation.invalid_reply());
                 }
                 answered = true;
                 if answer.role.as_deref() == Some("vertreter") {
@@ -329,45 +349,73 @@ impl Scope {
             }
         }
         if !answered {
-            return Err(invalid_reply());
+            return Err(operation.invalid_reply());
         }
         Ok(counts)
     }
-}
 
-// PostfachStatus has no Datenart filter on the wire; filter its counts locally.
-fn status_request(
-    hersteller_id: &str,
-    testmerker: Option<&str>,
-    einschraenkung: Einschraenkung,
-    von: Option<Date>,
-    bis: Option<Date>,
-) -> String {
-    let mut xml = String::with_capacity(1024);
-    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>
+    fn anfrage_datenarten(&self) -> &[&'static str] {
+        if self.datenarten.is_empty() {
+            DATENARTEN
+        } else {
+            &self.datenarten
+        }
+    }
+
+    fn request(
+        &self,
+        operation: Operation,
+        hersteller_id: &str,
+        test: bool,
+        cursor: Option<&str>,
+    ) -> CString {
+        let datenart = operation.datenart();
+        let mut xml = String::with_capacity(1024);
+        write!(xml, r#"<?xml version="1.0" encoding="UTF-8"?>
 <Elster xmlns="http://www.elster.de/elsterxml/schema/v11">
 <TransferHeader version="11">
-<Verfahren>ElsterDatenabholung</Verfahren><DatenArt>PostfachStatus</DatenArt><Vorgang>send-Auth</Vorgang>
-"#);
-    if let Some(marker) = testmerker {
-        writeln!(xml, "<Testmerker>{marker}</Testmerker>").unwrap();
-    }
-    write!(xml, r#"<HerstellerID>{hersteller_id}</HerstellerID><DatenLieferant>KIECLI</DatenLieferant>
+<Verfahren>ElsterDatenabholung</Verfahren><DatenArt>{datenart}</DatenArt><Vorgang>send-Auth</Vorgang>
+"#).unwrap();
+        if test {
+            xml.push_str("<Testmerker>700000001</Testmerker>\n");
+        }
+        write!(xml, r#"<HerstellerID>{hersteller_id}</HerstellerID><DatenLieferant>KIECLI</DatenLieferant>
 <Datei><Verschluesselung>CMSEncryptedData</Verschluesselung><Kompression>GZIP</Kompression><TransportSchluessel/></Datei>
 </TransferHeader>
 <DatenTeil><Nutzdatenblock>
 <NutzdatenHeader version="11"><NutzdatenTicket>1</NutzdatenTicket><Empfaenger id="L">CS</Empfaenger>
 <Hersteller><ProduktName>KIECLI</ProduktName><ProduktVersion>{}</ProduktVersion></Hersteller></NutzdatenHeader>
 <Nutzdaten><Datenabholung xmlns="http://finkonsens.de/elster/elsterdatenabholung/v3" version="32">
-<PostfachStatus einschraenkung="{}" rolle="inhaber""#, env!("CARGO_PKG_VERSION"), einschraenkung.as_str()).unwrap();
-    for (name, date) in [("von", von), ("bis", bis)] {
-        if let Some(date) = date {
-            let (year, month, day) = date.to_calendar_date();
-            write!(xml, " {name}=\"{year:04}{:02}{day:02}\"", u8::from(month)).unwrap();
+<{datenart} einschraenkung="{}" rolle="inhaber""#, env!("CARGO_PKG_VERSION"), self.einschraenkung.as_str()).unwrap();
+        for (name, date) in [("von", self.von), ("bis", self.bis)] {
+            if let Some(date) = date {
+                let (year, month, day) = date.to_calendar_date();
+                write!(xml, " {name}=\"{year:04}{:02}{day:02}\"", u8::from(month)).unwrap();
+            }
         }
+        match operation {
+            // PostfachStatus has no Datenart filter on the wire.
+            Operation::Status => xml.push_str("/>\n"),
+            Operation::Anfrage => {
+                xml.push_str(" max=\"10000\"");
+                if let Some(cursor) = cursor {
+                    write!(
+                        xml,
+                        " paginierungLetzteBestId=\"{}\"",
+                        quick_xml::escape::escape(cursor)
+                    )
+                    .unwrap();
+                }
+                xml.push_str(">\n");
+                for name in self.anfrage_datenarten() {
+                    writeln!(xml, "<DatenartBereitstellung name=\"{name}\"/>").unwrap();
+                }
+                xml.push_str("</PostfachAnfrage>\n");
+            }
+        }
+        xml.push_str("</Datenabholung></Nutzdaten>\n</Nutzdatenblock></DatenTeil>\n</Elster>\n");
+        CString::new(xml).expect("NUL-free Postfach request")
     }
-    xml.push_str("/>\n</Datenabholung></Nutzdaten>\n</Nutzdatenblock></DatenTeil>\n</Elster>\n");
-    xml
 }
 
 #[derive(Deserialize)]
@@ -448,7 +496,12 @@ struct ReturnCode {
 }
 
 impl<T> Reply<T> {
-    fn rejection(&self, code: i32, text: &mut Option<String>) -> Option<Failure> {
+    fn rejection(
+        &self,
+        operation: Operation,
+        code: i32,
+        text: &mut Option<String>,
+    ) -> Option<Failure> {
         let codes = self
             .header
             .rc
@@ -469,7 +522,7 @@ impl<T> Reply<T> {
                     || rejected_hersteller_id(rc)
             })
             .unwrap_or(first);
-        let mut failure = elster_failure(mapped);
+        let mut failure = operation.elster_failure(mapped);
         if code != 0 {
             failure = failure.eric_cause(code, text.take());
         }
@@ -480,10 +533,92 @@ impl<T> Reply<T> {
     }
 }
 
-fn decode_rejection(xml: &str, code: i32, text: &mut Option<String>) -> Option<Failure> {
-    quick_xml::de::from_str::<Reply<IgnoredAny>>(xml)
-        .ok()?
-        .rejection(code, text)
+impl Operation {
+    fn read_reply<T: for<'de> Deserialize<'de>>(
+        self,
+        code: i32,
+        xml: &str,
+        mut text: Option<String>,
+    ) -> Result<Reply<T>, Failure> {
+        if code != 0 {
+            return Err(self
+                .decode_rejection(xml, code, &mut text)
+                .unwrap_or_else(|| self.eric_failure(code, text)));
+        }
+        let reply = quick_xml::de::from_str::<Reply<T>>(xml).map_err(|_| {
+            self.decode_rejection(xml, code, &mut text)
+                .unwrap_or_else(|| self.invalid_reply())
+        })?;
+        if let Some(failure) = reply.rejection(self, code, &mut text) {
+            return Err(failure);
+        }
+        Ok(reply)
+    }
+
+    fn decode_rejection(self, xml: &str, code: i32, text: &mut Option<String>) -> Option<Failure> {
+        quick_xml::de::from_str::<Reply<IgnoredAny>>(xml)
+            .ok()?
+            .rejection(self, code, text)
+    }
+
+    fn invalid_reply(self) -> Failure {
+        let error = match self {
+            Self::Status => "postfach_status_invalid",
+            Self::Anfrage => "postfach_anfrage_invalid",
+        };
+        Failure::new(
+            1,
+            error,
+            format!("ELSTER did not return a valid {} answer", self.datenart()),
+        )
+        .note(eric::LOG_NOTE)
+    }
+
+    fn elster_failure(self, rc: &ReturnCode) -> Failure {
+        match rc.code {
+            190017608 => Failure::new(5, "postfach_too_many_entries", "ELSTER found more than 500,000 matching entries")
+                .help(match self {
+                    Self::Status => "Use --von or --bis to narrow the date range. --datenart only filters returned counts for PostfachStatus.",
+                    Self::Anfrage => "Use --von, --bis or --datenart to narrow the Anfrage.",
+                }),
+            190010802 => Failure::new(5, "datenart_not_released", "ELSTER has not released the Bereitstellungsdatenart"),
+            601015001 if rejected_hersteller_id(rc) => {
+                Failure::new(3, "hersteller_id_rejected", "ELSTER did not admit the HerstellerID")
+            }
+            130025001 => Failure::new(3, "certificate_not_admitted", "ELSTER did not admit the Certificate for this procedure"),
+            130025002 => test_certificate_error(),
+            _ => self.rejected(),
+        }
+    }
+
+    fn rejected(self) -> Failure {
+        Failure::new(
+            5,
+            "elster_rejected",
+            format!("ELSTER rejected the {} request", self.datenart()),
+        )
+    }
+
+    fn eric_failure(self, code: i32, text: Option<String>) -> Failure {
+        let failure = match code {
+            610301202 => Failure::new(3, "hersteller_id_blocked", "ERiC blocked the HerstellerID"),
+            610201106 => Failure::new(3, "pin_wrong", "The Certificate PIN is incorrect"),
+            610201107 => Failure::new(3, "pin_locked", "The Certificate PIN is locked"),
+            610101200 | 610101271 | 610101276 | 610101278 | 610101279 | 610101283 => {
+                Failure::transient(
+                    "eric_network_failed",
+                    "ERiC could not communicate with ELSTER",
+                )
+            }
+            610101210 | 610101292 => self.rejected(),
+            _ => Failure::new(
+                1,
+                "eric_process_failed",
+                format!("ERiC could not process {}", self.datenart()),
+            ),
+        };
+        failure.eric_cause(code, text).note(eric::LOG_NOTE)
+    }
 }
 
 fn rejected_hersteller_id(rc: &ReturnCode) -> bool {
@@ -492,54 +627,6 @@ fn rejected_hersteller_id(rc: &ReturnCode) -> bool {
             .text
             .as_deref()
             .is_some_and(|text| text.contains("HerstellerID ist nicht zugelassen"))
-}
-
-fn invalid_reply() -> Failure {
-    Failure::new(
-        1,
-        "postfach_status_invalid",
-        "ELSTER did not return a valid PostfachStatus answer",
-    )
-    .note(eric::LOG_NOTE)
-}
-
-fn elster_failure(rc: &ReturnCode) -> Failure {
-    match rc.code {
-        190017608 => Failure::new(5, "postfach_too_many_entries", "ELSTER found more than 500,000 matching entries")
-            .help("Use --von or --bis to narrow the date range. --datenart only filters returned counts for PostfachStatus."),
-        190010802 => Failure::new(5, "datenart_not_released", "ELSTER has not released the Bereitstellungsdatenart"),
-        601015001 if rejected_hersteller_id(rc) => {
-            Failure::new(3, "hersteller_id_rejected", "ELSTER did not admit the HerstellerID")
-        }
-        130025001 => Failure::new(3, "certificate_not_admitted", "ELSTER did not admit the Certificate for this procedure"),
-        130025002 => test_certificate_error(),
-        _ => Failure::new(5, "elster_rejected", "ELSTER rejected the PostfachStatus request"),
-    }
-}
-
-fn eric_failure(code: i32, text: Option<String>) -> Failure {
-    let failure = match code {
-        610301202 => Failure::new(3, "hersteller_id_blocked", "ERiC blocked the HerstellerID"),
-        610201106 => Failure::new(3, "pin_wrong", "The Certificate PIN is incorrect"),
-        610201107 => Failure::new(3, "pin_locked", "The Certificate PIN is locked"),
-        610101200 | 610101271 | 610101276 | 610101278 | 610101279 | 610101283 => {
-            Failure::transient(
-                "eric_network_failed",
-                "ERiC could not communicate with ELSTER",
-            )
-        }
-        610101210 | 610101292 => Failure::new(
-            5,
-            "elster_rejected",
-            "ELSTER rejected the PostfachStatus request",
-        ),
-        _ => Failure::new(
-            1,
-            "eric_process_failed",
-            "ERiC could not process PostfachStatus",
-        ),
-    };
-    failure.eric_cause(code, text).note(eric::LOG_NOTE)
 }
 
 fn test_certificate_error() -> Failure {
@@ -558,9 +645,21 @@ struct Count {
 }
 
 #[derive(Serialize)]
-struct Status {
-    bereitstellungsdatenarten: Vec<Count>,
-    einschraenkung: Einschraenkung,
+#[serde(untagged)]
+enum Results {
+    Status {
+        bereitstellungsdatenarten: Vec<Count>,
+        einschraenkung: Einschraenkung,
+    },
+    Anfrage {
+        postfach_nachrichten: Vec<anfrage::Nachricht>,
+    },
+}
+
+#[derive(Serialize)]
+struct Output {
+    #[serde(flatten)]
+    results: Results,
     test: bool,
     profile: Option<String>,
     warnings: Vec<config::Warning>,
@@ -568,15 +667,30 @@ struct Status {
     trace: Option<Vec<eric::TraceEvent>>,
 }
 
-impl Status {
+impl Output {
     fn write_text(&self, mut out: impl Write) -> std::io::Result<()> {
-        writeln!(
-            out,
-            "Postfach counts (ELSTER may omit some kinds): {}",
-            self.einschraenkung.as_str()
-        )?;
-        for count in &self.bereitstellungsdatenarten {
-            writeln!(out, "{}: {}", count.name.escape_debug(), count.anzahl)?;
+        match &self.results {
+            Results::Status {
+                bereitstellungsdatenarten,
+                einschraenkung,
+            } => {
+                writeln!(
+                    out,
+                    "Postfach counts (ELSTER may omit some kinds): {}",
+                    einschraenkung.as_str()
+                )?;
+                for count in bereitstellungsdatenarten {
+                    writeln!(out, "{}: {}", count.name.escape_debug(), count.anzahl)?;
+                }
+            }
+            Results::Anfrage {
+                postfach_nachrichten,
+            } => {
+                writeln!(out, "Postfach-Nachrichten: {}", postfach_nachrichten.len())?;
+                for nachricht in postfach_nachrichten {
+                    nachricht.write_text(&mut out)?;
+                }
+            }
         }
         writeln!(
             out,
@@ -589,6 +703,14 @@ impl Status {
         }
         if let Some(trace) = &self.trace {
             for event in trace {
+                if let Some(page) = event.page {
+                    writeln!(
+                        out,
+                        "{} (page {page}): {} ms",
+                        event.call, event.duration_ms
+                    )?;
+                    continue;
+                }
                 writeln!(out, "{}: {} ms", event.call, event.duration_ms)?;
             }
         }
@@ -596,45 +718,68 @@ impl Status {
     }
 }
 
-pub(crate) fn status(cli: &Cli, options: &Options, mut out: impl Write) -> Result<(), Failure> {
-    let scope = Scope::new(cli, options)?;
+pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(), Failure> {
+    let (options, operation) = match command {
+        Command::Status(options) => (options, Operation::Status),
+        Command::Anfrage(options) => (options, Operation::Anfrage),
+    };
+    let scope = Scope::new(cli, options, operation)?;
     let (mut settings, path, pin, hersteller_id) = config::request_settings(cli)?;
     let installed = eric::installed_dir(&settings.eric_dir)?;
     let dir = installed.as_deref().unwrap_or(&settings.eric_dir);
     let mut probe = eric::Probe::new(dir, cli.verbose);
-    let counts = probe
+    let results = probe
         .with_session(dir, cli.eric_log.as_deref(), |session, trace| {
             session.with_certificate(&path, trace, |cert, trace| {
-                scope.execute(
-                    &(cert, &pin),
-                    &hersteller_id,
+                let eric = (cert, &pin);
+                Scope::preflight(
+                    &eric,
                     settings.test,
                     &mut settings.warnings,
                     OffsetDateTime::now_utc(),
                     trace,
-                )
+                )?;
+                match operation {
+                    Operation::Status => Ok(Results::Status {
+                        bereitstellungsdatenarten: scope.execute(
+                            &eric,
+                            &hersteller_id,
+                            settings.test,
+                            trace,
+                        )?,
+                        einschraenkung: scope.einschraenkung,
+                    }),
+                    Operation::Anfrage => Ok(Results::Anfrage {
+                        postfach_nachrichten: anfrage::execute(
+                            &scope,
+                            &eric,
+                            &hersteller_id,
+                            settings.test,
+                            trace,
+                        )?,
+                    }),
+                }
             })
         })
         .map_err(|failure| {
             if failure.code() != TEST_CERTIFICATE_REQUIRES_TESTMERKER {
                 return failure;
             }
-            match options.correction(cli, None, true) {
+            match options.correction(cli, operation, None, true) {
                 Some(command) => failure.suggestion(command),
                 None => failure,
             }
         })?;
-    let status = Status {
-        bereitstellungsdatenarten: counts,
-        einschraenkung: scope.einschraenkung,
+    let output = Output {
+        results,
         test: settings.test,
         profile: settings.profile,
         warnings: settings.warnings,
         trace: probe.trace,
     };
     match cli.format {
-        Format::Json => write_json(out, &status),
-        Format::Text => status.write_text(&mut out),
+        Format::Json => write_json(out, &output),
+        Format::Text => output.write_text(&mut out),
     }
     .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
 }

@@ -53,6 +53,29 @@ fn corrects_datenart_case_before_resolving_credentials() {
 }
 
 #[test]
+fn anfrage_correction_keeps_the_requested_command_and_scope() {
+    let home = TempDir::new().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_kiecli"))
+        .env_clear()
+        .env("HOME", home.path())
+        .args([
+            "postfach",
+            "anfrage",
+            "--alle",
+            "--datenart",
+            "epmitteilung",
+        ])
+        .output()
+        .unwrap();
+    let value = error(output, 2);
+    assert_eq!(value["code"], "datenart_unknown");
+    assert_eq!(
+        value["suggestion"],
+        "kiecli postfach anfrage --alle --datenart=EPMitteilung"
+    );
+}
+
+#[test]
 fn correction_does_not_echo_a_pin_command() {
     let home = TempDir::new().unwrap();
     let output = cli(&home)

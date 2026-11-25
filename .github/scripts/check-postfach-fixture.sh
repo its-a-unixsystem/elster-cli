@@ -27,4 +27,6 @@ header=$(schema_archive elster_v11_schema)
 unzip -qq "$datenabholung" 'Schemata/*' -d "$work"
 mkdir "$work/Schemata/header"
 unzip -jqq "$header" 'v11/Schemata/header/*.xsd' -d "$work/Schemata/header"
-xmllint --nonet --noout --schema "$work/Schemata/elster11_datenabholung_32.xsd" tests/fixtures/elster/postfach-status.xml
+xmllint --nonet --noout --schema "$work/Schemata/elster11_datenabholung_32.xsd" \
+    tests/fixtures/elster/postfach-status.xml \
+    tests/fixtures/elster/postfach-anfrage.xml

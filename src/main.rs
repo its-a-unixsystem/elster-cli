@@ -183,9 +183,7 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
         Command::Zertifikat {
             command: CertificateCommand::Status,
         } => certificate::status(cli, stdout),
-        Command::Postfach {
-            command: postfach::Command::Status(options),
-        } => postfach::status(cli, options, stdout),
+        Command::Postfach { command } => postfach::run(cli, command, stdout),
     }
 }
 

@@ -48,6 +48,8 @@ pub(crate) fn serialize_path<S: Serializer>(path: &Path, serializer: S) -> Resul
 pub(crate) struct TraceEvent {
     pub(crate) call: &'static str,
     pub(crate) duration_ms: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) page: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -609,6 +611,7 @@ fn timed<T>(trace: &mut Option<Vec<TraceEvent>>, call: &'static str, f: impl FnO
         trace.push(TraceEvent {
             call,
             duration_ms: start.elapsed().as_millis(),
+            page: None,
         });
         result
     } else {

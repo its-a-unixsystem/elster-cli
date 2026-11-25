@@ -123,7 +123,7 @@ jobs:
       - uses: ./.github/actions/install-test-eric
         id: eric
       - run: cargo build --locked
-      - name: Exercise Postfach status on the ELSTER test system
+      - name: Exercise Postfach status and Anfrage on the ELSTER test system
         shell: bash
         env:
           KIECLI_ERIC_DIR: ${{ steps.eric.outputs.home }}
@@ -151,7 +151,8 @@ jobs:
           else
             [[ $? == 1 ]] || exit 1
           fi
-          target/debug/kiecli postfach status --test --alle --von "$(date -u -d yesterday +%F)" \
+          since=$(date -u -d yesterday +%F)
+          target/debug/kiecli postfach status --test --alle --von "$since" \
             > "$tmp/status.json" 2> "$tmp/status-error.json" || {
               echo 'Postfach status failed on the ELSTER test system.' >&2
               exit 1
@@ -160,3 +161,13 @@ jobs:
             (.bereitstellungsdatenarten | type == "array" and
               all(.[]; (.name | type == "string") and (.anzahl | type == "number")))' \
             "$tmp/status.json" > /dev/null
+          target/debug/kiecli postfach anfrage --test --alle --von "$since" \
+            > "$tmp/anfrage.json" 2> "$tmp/anfrage-error.json" || {
+              echo 'Postfach Anfrage failed on the ELSTER test system.' >&2
+              exit 1
+            }
+          jq -e '.test == true and
+            (.postfach_nachrichten | type == "array" and
+              all(.[]; (.id | type == "string") and (.bereitstellungsdatenart | type == "string")) and
+              (map(.id) == (map(.id) | sort)))' \
+            "$tmp/anfrage.json" > /dev/null

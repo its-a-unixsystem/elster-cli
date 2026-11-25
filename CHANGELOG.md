@@ -9,6 +9,7 @@
 - `config show` reports the effective settings and their sources without opening a Certificate, loading ERiC, or disclosing PIN details.
 - `zertifikat status` opens a Certificate with its PIN and reports validity, Konto-ID, and Certificate properties offline. It requires no HerstellerID and warns about expired, not-yet-valid, and soon-to-expire Certificates.
 - `postfach status` reports ELSTER's approximate Postfach counts without collecting or confirming Nachrichten. It supports date bounds and a local Bereitstellungsdatenart filter.
+- `postfach anfrage` lists Postfach metadata, including object references and decoded Anschreiben, in ID order across all pages without collecting or confirming Nachrichten.
 
 ### Security
 

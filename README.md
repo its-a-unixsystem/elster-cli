@@ -16,7 +16,7 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-`eric install`, `eric status`, `config show`, `zertifikat status`, and `postfach status` are available. `zertifikat status` needs a Certificate and PIN; `postfach status` also needs a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+`eric install`, `eric status`, `config show`, `zertifikat status`, `postfach status`, and `postfach anfrage` are available. `zertifikat status` needs a Certificate and PIN; Postfach commands also need a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
 
 On Linux x86_64 with `libgcc_s.so.1` installed, review `lizenz.pdf` inside the [official ERiC package](https://download.elster.de/download/eric/eric_44/ERiC-44.3.6.0-Linux-x86_64.jar) (a ZIP archive) and the [tax administration's data-protection notice](https://www.elster.de/eportal/helpGlobal?themaGlobal=datenschutz_public#ds_steuerverw). If you accept the terms:
 
@@ -54,6 +54,10 @@ PINs can also come from `KIECLI_PIN` or a non-interactive `--pin-command`. The c
 
 Run `cargo run -- postfach status --profile NAME --von YYYY-MM-DD` to ask ELSTER for counts without collecting or confirming any Nachrichten. The default is `--neue` (not yet confirmed); use `--alle` to include confirmed Nachrichten. ELSTER may omit some Bereitstellungsdatenarten, so treat the counts as a hint. `--datenart NAME` filters the returned counts locally; use `--von` or `--bis` to narrow a request that exceeds ELSTER's limit. Use `--test` with a test Certificate; otherwise the command uses the live service by default.
 
+## Listing Postfach metadata
+
+Run `cargo run -- postfach anfrage --profile NAME --von YYYY-MM-DD` to list Postfach-Nachrichten. It asks ELSTER directly rather than relying on `postfach status`, follows all pages, and returns metadata in ID order without collecting or confirming anything. The default is `--neue`; use `--alle` for already confirmed Nachrichten too. Repeat `--datenart NAME` to limit what ELSTER searches. Use `--test` with a test Certificate.
+
 ## Continuous integration
 
 CI checks formatting, Clippy, tests, dependency licences and advisories, and
@@ -64,7 +68,7 @@ and the placeholder HerstellerID `12345`. It sends one read-only PostfachStatus
 and expects ELSTER's `601015001` reply. ELSTER files remain on the ephemeral
 runner and are not uploaded to caches or artifacts.
 
-To exercise the production `postfach status` command against the ELSTER test
+To exercise `postfach status` and `postfach anfrage` against the ELSTER test
 system, dispatch CI on `main` with `test_system` enabled. The `elster-test`
 environment must supply the `KIECLI_HERSTELLER_ID` secret and require maintainer
 approval. The weekly `main` run uses the same secret from
