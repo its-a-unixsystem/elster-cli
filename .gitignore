@@ -5,3 +5,6 @@ docs/API/
 .claude/
 .agents/
 skills-lock.json
+
+# Local ELSTER binaries (ERiC/Otto, never redistributed) and throwaway spike code
+local/
