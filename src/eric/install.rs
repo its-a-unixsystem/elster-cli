@@ -161,7 +161,7 @@ impl Installed<'_> {
             self.data_protection_notice
         )?;
         for warning in &self.warnings {
-            writeln!(out, "warning[{}]: {}", warning.code, warning.message)?;
+            warning.write_text(&mut out)?;
         }
         if let Some(trace) = &self.trace {
             for event in trace {

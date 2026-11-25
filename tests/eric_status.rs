@@ -161,6 +161,24 @@ fn config_paths_are_relative_to_the_file_and_flags_win() {
 }
 
 #[test]
+fn status_ignores_unused_credential_values() {
+    let home = TempDir::new().unwrap();
+    std::fs::write(
+        home.path().join("settings.toml"),
+        "hersteller_id = 12345\n[profile.firma]\ncertificate = false\ntest = true\n",
+    )
+    .unwrap();
+    let output = cli(home.path())
+        .args(["eric", "status", "--config", "settings.toml"])
+        .output()
+        .unwrap();
+    error(&output, 4, "eric_missing");
+    let status: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(status["profile"], "firma");
+    assert_eq!(status["test"], true);
+}
+
+#[test]
 fn reports_loader_failures_for_non_utf8_paths_as_valid_json() {
     let home = TempDir::new().unwrap();
     let package = home

@@ -35,6 +35,24 @@ struct Cli {
     test: bool,
     #[arg(long, global = true, overrides_with = "test")]
     no_test: bool,
+    /// Path to the Taxpayer's Certificate.
+    #[arg(long, global = true)]
+    certificate: Option<PathBuf>,
+    /// Read the PIN from this file when opening a Certificate.
+    #[arg(long, global = true)]
+    pin_file: Option<PathBuf>,
+    /// Run this shell command to obtain the PIN when opening a Certificate.
+    #[arg(long, global = true)]
+    pin_command: Option<String>,
+    /// The five-digit HerstellerID.
+    #[arg(long, global = true)]
+    hersteller_id: Option<String>,
+    /// The Taxpayer's Steuernummer.
+    #[arg(long, global = true)]
+    steuernummer: Option<String>,
+    /// Bundesland for a Bescheid-format Steuernummer.
+    #[arg(long, global = true)]
+    bundesland: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -53,6 +71,11 @@ enum Command {
         #[command(subcommand)]
         command: EricCommand,
     },
+    /// Inspect local configuration.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -61,6 +84,12 @@ enum EricCommand {
     Status,
     /// Download, verify and activate ERiC and Otto.
     Install(Options),
+}
+
+#[derive(Subcommand)]
+enum ConfigCommand {
+    /// Show effective settings and their sources without using credentials.
+    Show,
 }
 
 #[derive(Serialize)]
@@ -77,6 +106,14 @@ struct Status<'a> {
 }
 
 fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
+    // Both flags can be provided at different levels of the subcommand tree.
+    if cli.pin_file.is_some() && cli.pin_command.is_some() {
+        return Err(Failure::new(
+            2,
+            "usage_error",
+            "Use either --pin-file or --pin-command, not both",
+        ));
+    }
     match &cli.command {
         Command::Eric {
             command: EricCommand::Status,
@@ -121,6 +158,9 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
             }
             .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
         }
+        Command::Config {
+            command: ConfigCommand::Show,
+        } => config::show(cli, stdout),
     }
 }
 
@@ -160,7 +200,7 @@ impl Status<'_> {
             self.profile.as_deref().unwrap_or("none")
         )?;
         for warning in &self.warnings {
-            writeln!(out, "warning[{}]: {}", warning.code, warning.message)?;
+            warning.write_text(&mut out)?;
         }
         if let Some(trace) = &self.probe.trace {
             for event in trace {

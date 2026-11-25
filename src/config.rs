@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
+use std::borrow::Cow;
 use std::env;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf, absolute};
 
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use toml::{Table, Value};
 
-use crate::{Cli, error::Failure};
+use crate::{Cli, Format, error::Failure, write_json};
 
 const ROOT_KEYS: &[&str] = &["eric_dir", "hersteller_id", "default_profile", "profile"];
 const PROFILE_KEYS: &[&str] = &[
@@ -25,14 +26,26 @@ const PROFILE_KEYS: &[&str] = &[
 #[derive(Deserialize, Default)]
 struct Config {
     eric_dir: Option<PathBuf>,
+    hersteller_id: Option<Value>,
     default_profile: Option<String>,
     #[serde(default)]
     profile: std::collections::BTreeMap<String, Profile>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 struct Profile {
     test: Option<bool>,
+    #[serde(flatten)]
+    details: Table,
+}
+
+#[derive(Deserialize)]
+struct ProfileDetails {
+    certificate: Option<PathBuf>,
+    pin_file: Option<PathBuf>,
+    pin_command: Option<String>,
+    steuernummer: Option<String>,
+    bundesland: Option<String>,
 }
 
 pub(crate) struct Settings {
@@ -44,110 +57,402 @@ pub(crate) struct Settings {
 
 #[derive(Serialize)]
 pub(crate) struct Warning {
-    pub(crate) code: &'static str,
-    pub(crate) message: &'static str,
+    code: &'static str,
+    message: &'static str,
+}
+
+impl Warning {
+    pub(crate) fn write_text(&self, mut out: impl Write) -> io::Result<()> {
+        writeln!(out, "warning[{}]: {}", self.code, self.message)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Source {
+    Flag,
+    Env,
+    File,
+    Default,
+}
+
+struct Resolved<T> {
+    value: T,
+    source: Source,
+}
+
+fn select<T>(
+    flag: Option<T>,
+    env: impl FnOnce() -> Result<Option<T>, Failure>,
+    file: Option<T>,
+) -> Result<Resolved<Option<T>>, Failure> {
+    let (value, source) = if flag.is_some() {
+        (flag, Source::Flag)
+    } else if let Some(value) = env()? {
+        (Some(value), Source::Env)
+    } else if file.is_some() {
+        (file, Source::File)
+    } else {
+        (None, Source::Default)
+    };
+    Ok(Resolved { value, source })
+}
+
+struct Layers {
+    base: Option<BaseDirs>,
+    config: Resolved<Option<PathBuf>>,
+    profile: Resolved<Option<String>>,
+    selected: Profile,
+    eric_dir: Resolved<PathBuf>,
+    test: Resolved<bool>,
+    hersteller_id: Option<Value>,
+    warnings: Vec<Warning>,
+}
+
+impl Layers {
+    fn load(cli: &Cli) -> Result<Self, Failure> {
+        let base = BaseDirs::new();
+        let home = base.as_ref().map(BaseDirs::home_dir);
+        let mut config = select(cli.config.clone(), || Ok(env_path("KIECLI_CONFIG")), None)?;
+        let required = config.source != Source::Default;
+        if let Some(path) = config.value {
+            config.value = Some(resolve_path(&path, home, None)?);
+        } else {
+            config.value = base
+                .as_ref()
+                .map(|base| base.config_dir().join("kiecli/config.toml"));
+        }
+        let mut file = match config.value.as_deref() {
+            Some(path) => read_config(path, required)?,
+            None => Config::default(),
+        };
+        let dir = select(
+            cli.eric_dir.clone(),
+            || Ok(env_path("KIECLI_ERIC_DIR")),
+            file.eric_dir,
+        )?;
+        let eric_dir = Resolved {
+            value: match dir.value {
+                Some(path) => resolve_path(&path, home, relative_to(dir.source, &config))?,
+                None => base
+                    .as_ref()
+                    .map(|base| base.data_dir().join(crate::eric::DEFAULT_DATA_DIR))
+                    .ok_or_else(|| {
+                        Failure::new(
+                            3,
+                            "eric_dir_unresolved",
+                            "Could not determine the default ERiC directory",
+                        )
+                        .help("Set --eric-dir, KIECLI_ERIC_DIR or eric_dir in the config file.")
+                    })?,
+            },
+            source: dir.source,
+        };
+
+        let mut profile = select(
+            cli.profile.clone(),
+            || read_env("KIECLI_PROFILE"),
+            file.default_profile,
+        )?;
+        let selected = match profile.value.as_deref() {
+            Some(name) => file.profile.remove(name).ok_or_else(|| {
+                Failure::new(3, "profile_unknown", format!("Unknown profile '{name}'"))
+            })?,
+            None if file.profile.len() > 1 => {
+                let names = file
+                    .profile
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(Failure::new(
+                    3,
+                    "profile_required",
+                    format!("Select a profile: {names}"),
+                )
+                .help("Use --profile, KIECLI_PROFILE or default_profile in the config file."));
+            }
+            None => match file.profile.pop_first() {
+                Some((name, selected)) => {
+                    profile = Resolved {
+                        value: Some(name),
+                        source: Source::File,
+                    };
+                    selected
+                }
+                None => Profile::default(),
+            },
+        };
+        let mut warnings = Vec::new();
+        let test = profile_setting(
+            (cli.test || cli.no_test).then_some(cli.test),
+            read_test,
+            selected.test,
+            "KIECLI_TEST overrides the profile's test setting",
+            &mut warnings,
+        )?;
+        Ok(Self {
+            base,
+            config,
+            profile,
+            selected,
+            eric_dir,
+            test: Resolved {
+                value: test.value.unwrap_or_default(),
+                source: test.source,
+            },
+            hersteller_id: file.hersteller_id,
+            warnings,
+        })
+    }
+}
+
+fn env_path(key: &str) -> Option<PathBuf> {
+    env::var_os(key).map(PathBuf::from)
+}
+
+fn relative_to(source: Source, config: &Resolved<Option<PathBuf>>) -> Option<&Path> {
+    if source == Source::File {
+        config.value.as_deref().and_then(Path::parent)
+    } else {
+        None
+    }
+}
+
+fn read_test() -> Result<Option<bool>, Failure> {
+    match read_env("KIECLI_TEST")?.as_deref() {
+        Some("0") => Ok(Some(false)),
+        Some("1") => Ok(Some(true)),
+        None => Ok(None),
+        Some(_) => Err(Failure::new(
+            3,
+            "test_invalid",
+            "KIECLI_TEST must be 0 or 1",
+        )),
+    }
+}
+
+fn warn_override(warnings: &mut Vec<Warning>, message: &'static str) {
+    warnings.push(Warning {
+        code: "env_overrides_profile",
+        message,
+    });
+}
+
+fn profile_setting<T>(
+    flag: Option<T>,
+    env: impl FnOnce() -> Result<Option<T>, Failure>,
+    file: Option<T>,
+    warning: &'static str,
+    warnings: &mut Vec<Warning>,
+) -> Result<Resolved<Option<T>>, Failure> {
+    let in_profile = file.is_some();
+    let setting = select(flag, env, file)?;
+    if setting.source == Source::Env && in_profile {
+        warn_override(warnings, warning);
+    }
+    Ok(setting)
 }
 
 pub(crate) fn resolve(cli: &Cli) -> Result<Settings, Failure> {
-    let base = BaseDirs::new();
-    let home = base.as_ref().map(BaseDirs::home_dir);
-    let explicit_config = cli
-        .config
-        .clone()
-        .or_else(|| env::var_os("KIECLI_CONFIG").map(PathBuf::from));
-    let file = if let Some(path) = explicit_config.as_ref() {
-        Some(resolve_path(path, home, None)?)
-    } else {
-        base.as_ref()
-            .map(|base| base.config_dir().join("kiecli/config.toml"))
-    };
-    let config = match file.as_deref() {
-        Some(path) => read_config(path, explicit_config.is_some())?,
-        None => Config::default(),
-    };
-
-    let eric_dir = if let Some(path) = cli
-        .eric_dir
-        .clone()
-        .or_else(|| env::var_os("KIECLI_ERIC_DIR").map(PathBuf::from))
-    {
-        resolve_path(&path, home, None)?
-    } else if let Some(path) = config.eric_dir.as_deref() {
-        resolve_path(path, home, file.as_deref().and_then(Path::parent))?
-    } else {
-        base.as_ref()
-            .map(|base| base.data_dir().join(crate::eric::DEFAULT_DATA_DIR))
-            .ok_or_else(|| {
-                Failure::new(
-                    3,
-                    "eric_dir_unresolved",
-                    "Could not determine the default ERiC directory",
-                )
-                .help("Set --eric-dir, KIECLI_ERIC_DIR or eric_dir in the config file.")
-            })?
-    };
-
-    let requested_profile = match &cli.profile {
-        Some(name) => Some(name.clone()),
-        None => read_env("KIECLI_PROFILE")?.or(config.default_profile),
-    };
-    let profile = match requested_profile {
-        Some(name) if !config.profile.contains_key(&name) => {
-            return Err(Failure::new(
-                3,
-                "profile_unknown",
-                format!("Unknown profile '{name}'"),
-            ));
-        }
-        selected @ Some(_) => selected,
-        None if config.profile.len() > 1 => {
-            let names = config
-                .profile
-                .keys()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(
-                Failure::new(3, "profile_required", format!("Select a profile: {names}"))
-                    .help("Use --profile, KIECLI_PROFILE or default_profile in the config file."),
-            );
-        }
-        None => config
-            .profile
-            .first_key_value()
-            .map(|(name, _)| name.clone()),
-    };
-    let profile_test = profile.as_ref().and_then(|name| config.profile[name].test);
-    let mut warnings = Vec::new();
-    let test = if cli.test || cli.no_test {
-        cli.test
-    } else {
-        match read_env("KIECLI_TEST")?.as_deref() {
-            Some(value @ ("0" | "1")) => {
-                if profile_test.is_some() {
-                    warnings.push(Warning {
-                        code: "env_overrides_profile",
-                        message: "KIECLI_TEST overrides the profile's test setting",
-                    });
-                }
-                value == "1"
-            }
-            Some(_) => {
-                return Err(Failure::new(
-                    3,
-                    "test_invalid",
-                    "KIECLI_TEST must be 0 or 1",
-                ));
-            }
-            None => profile_test.unwrap_or_default(),
-        }
-    };
+    let layers = Layers::load(cli)?;
     Ok(Settings {
-        eric_dir,
-        profile,
-        test,
-        warnings,
+        eric_dir: layers.eric_dir.value,
+        profile: layers.profile.value,
+        test: layers.test.value,
+        warnings: layers.warnings,
     })
+}
+
+pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
+    let mut layers = Layers::load(cli)?;
+    let invalid = || {
+        Failure::new(
+            3,
+            "config_invalid",
+            "Invalid HerstellerID or selected profile setting type in the config file",
+        )
+    };
+    let profile: ProfileDetails = layers.selected.details.try_into().map_err(|_| invalid())?;
+    let home = layers.base.as_ref().map(BaseDirs::home_dir);
+    let certificate = profile_setting(
+        cli.certificate.clone(),
+        || Ok(env_path("KIECLI_CERTIFICATE")),
+        profile.certificate,
+        "KIECLI_CERTIFICATE overrides the profile's certificate setting",
+        &mut layers.warnings,
+    )?;
+    let certificate_path = certificate
+        .value
+        .as_deref()
+        .map(|path| resolve_path(path, home, relative_to(certificate.source, &layers.config)))
+        .transpose()?;
+    let steuernummer = profile_setting(
+        cli.steuernummer.clone(),
+        || read_env("KIECLI_STEUERNUMMER"),
+        profile.steuernummer,
+        "KIECLI_STEUERNUMMER overrides the profile's steuernummer setting",
+        &mut layers.warnings,
+    )?;
+    let bundesland = profile_setting(
+        cli.bundesland.clone(),
+        || read_env("KIECLI_BUNDESLAND"),
+        profile.bundesland,
+        "KIECLI_BUNDESLAND overrides the profile's bundesland setting",
+        &mut layers.warnings,
+    )?;
+    let hersteller_id = select(
+        cli.hersteller_id.clone(),
+        || read_env("KIECLI_HERSTELLER_ID"),
+        layers
+            .hersteller_id
+            .map(Value::try_into)
+            .transpose()
+            .map_err(|_| invalid())?,
+    )?;
+    if hersteller_id
+        .value
+        .as_ref()
+        .is_some_and(|id| id.len() != 5 || !id.bytes().all(|byte| byte.is_ascii_digit()))
+    {
+        return Err(Failure::new(
+            3,
+            "hersteller_id_invalid",
+            "HerstellerID must be five digits",
+        )
+        .help("Set --hersteller-id, KIECLI_HERSTELLER_ID or hersteller_id in the config file."));
+    }
+    let pin = profile_setting(
+        pin_channel(cli.pin_file.is_some(), cli.pin_command.is_some()),
+        || {
+            Ok(if env::var_os("KIECLI_PIN").is_some() {
+                Some("env")
+            } else if env::var_os("KIECLI_PIN_FILE").is_some() {
+                Some("file")
+            } else {
+                env::var_os("KIECLI_PIN_COMMAND").map(|_| "command")
+            })
+        },
+        pin_channel(profile.pin_file.is_some(), profile.pin_command.is_some()),
+        "The PIN environment setting overrides the profile's pin_file or pin_command setting",
+        &mut layers.warnings,
+    )?;
+
+    let file_source = layers
+        .config
+        .value
+        .as_ref()
+        .map(|path| format!("file:{}", path.display()));
+    let source = |s| match s {
+        Source::Flag => "flag",
+        Source::Env => "env",
+        Source::File => file_source
+            .as_deref()
+            .expect("file source requires a config path"),
+        Source::Default => "default",
+    };
+    let report = Show {
+        config: Shown::new(
+            layers.config.value.as_deref().map(Path::to_string_lossy),
+            source(layers.config.source),
+        ),
+        eric_dir: Shown::new(
+            Some(layers.eric_dir.value.to_string_lossy()),
+            source(layers.eric_dir.source),
+        ),
+        certificate: Shown::new(
+            certificate_path.as_deref().map(Path::to_string_lossy),
+            source(certificate.source),
+        ),
+        pin: Shown::new(pin.value, source(pin.source)),
+        hersteller_id: Shown::new(hersteller_id.value.as_deref(), source(hersteller_id.source)),
+        steuernummer: Shown::new(steuernummer.value.as_deref(), source(steuernummer.source)),
+        bundesland: Shown::new(bundesland.value.as_deref(), source(bundesland.source)),
+        profile: layers.profile.value.as_deref(),
+        profile_source: source(layers.profile.source),
+        test: layers.test.value,
+        test_source: source(layers.test.source),
+        warnings: &layers.warnings,
+        trace: cli.verbose.then_some(&[]),
+    };
+    match cli.format {
+        Format::Json => write_json(out, &report),
+        Format::Text => report.write_text(&mut out),
+    }
+    .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
+}
+
+fn pin_channel(file: bool, command: bool) -> Option<&'static str> {
+    if file {
+        Some("file")
+    } else if command {
+        Some("command")
+    } else {
+        None
+    }
+}
+
+#[derive(Serialize)]
+struct Shown<'a, T> {
+    value: Option<T>,
+    source: &'a str,
+}
+
+impl<'a, T> Shown<'a, T> {
+    fn new(value: Option<T>, source: &'a str) -> Self {
+        Self { value, source }
+    }
+}
+
+impl<T: AsRef<str>> Shown<'_, T> {
+    fn write_text(&self, mut out: impl Write, name: &str) -> io::Result<()> {
+        let value = self.value.as_ref().map_or("none", AsRef::as_ref);
+        writeln!(
+            out,
+            "{name}: {} ({})",
+            value.escape_debug(),
+            self.source.escape_debug()
+        )
+    }
+}
+
+#[derive(Serialize)]
+struct Show<'a> {
+    config: Shown<'a, Cow<'a, str>>,
+    eric_dir: Shown<'a, Cow<'a, str>>,
+    certificate: Shown<'a, Cow<'a, str>>,
+    pin: Shown<'a, &'a str>,
+    hersteller_id: Shown<'a, &'a str>,
+    steuernummer: Shown<'a, &'a str>,
+    bundesland: Shown<'a, &'a str>,
+    profile: Option<&'a str>,
+    profile_source: &'a str,
+    test: bool,
+    test_source: &'a str,
+    warnings: &'a [Warning],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trace: Option<&'static [crate::eric::TraceEvent]>,
+}
+
+impl Show<'_> {
+    fn write_text(&self, mut out: impl Write) -> io::Result<()> {
+        Shown::new(self.profile, self.profile_source).write_text(&mut out, "profile")?;
+        Shown::new(
+            Some(if self.test { "true" } else { "false" }),
+            self.test_source,
+        )
+        .write_text(&mut out, "test")?;
+        self.config.write_text(&mut out, "config")?;
+        self.eric_dir.write_text(&mut out, "eric_dir")?;
+        self.certificate.write_text(&mut out, "certificate")?;
+        self.pin.write_text(&mut out, "pin")?;
+        self.hersteller_id.write_text(&mut out, "hersteller_id")?;
+        self.steuernummer.write_text(&mut out, "steuernummer")?;
+        self.bundesland.write_text(&mut out, "bundesland")?;
+        for warning in self.warnings {
+            warning.write_text(&mut out)?;
+        }
+        Ok(())
+    }
 }
 
 fn read_env(key: &'static str) -> Result<Option<String>, Failure> {
