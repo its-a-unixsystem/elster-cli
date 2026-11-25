@@ -5,3 +5,11 @@ sha256 = "e36df8b02045ff3449eb23e086a39f5455b709c967e708eae44f27099ce4de95"
 [test_certificate]
 url = "https://download.elster.de/download/schnittstellen/Test_Zertifikate.zip"
 sha256 = "0c058565c88b6f586361ce6a74880a541878edb213ef763704fe9e5904c61f77"
+
+[datenabholung_schema]
+url = "https://download.elster.de/download/schnittstellen/ElsterDatenabholung-v32.0.1.zip"
+sha256 = "2c49f69aa3d25202938591a1d89140f41ae34a673441f458d0888f9de0984d7f"
+
+[elster_v11_schema]
+url = "https://download.elster.de/download/schnittstellen/ElsterXML-Schnittstelle_V11_2026.9.21.0.zip"
+sha256 = "f1d297742f9b347fe9e6d8c221f6ac7d4ae0c38ccaf3d488ef62b0562dbab876"

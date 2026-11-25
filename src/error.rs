@@ -15,13 +15,15 @@ pub(crate) struct Failure {
     #[serde(skip)]
     pub(crate) exit: u8,
     code: &'static str,
-    message: String,
+    message: Box<str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     notes: Vec<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    help: Option<String>,
+    help: Option<Box<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    cause: Option<Box<[Cause; 1]>>,
+    suggestion: Option<Box<str>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cause: Vec<Cause>,
     retry: bool,
 }
 
@@ -39,12 +41,17 @@ impl Failure {
         Self {
             exit,
             code,
-            message: message.into(),
+            message: message.into().into_boxed_str(),
             notes: Vec::new(),
             help: None,
-            cause: None,
+            suggestion: None,
+            cause: Vec::new(),
             retry: false,
         }
+    }
+
+    pub(crate) fn code(&self) -> &'static str {
+        self.code
     }
 
     pub(crate) fn transient(code: &'static str, message: impl Into<String>) -> Self {
@@ -54,7 +61,7 @@ impl Failure {
     }
 
     pub(crate) fn help(mut self, help: impl Into<String>) -> Self {
-        self.help = Some(help.into());
+        self.help = Some(help.into().into_boxed_str());
         self
     }
 
@@ -63,22 +70,27 @@ impl Failure {
         self
     }
 
-    pub(crate) fn eric_cause(mut self, code: i32, text: Option<String>) -> Self {
-        self.cause = Some(Box::new([Cause {
-            source: "eric",
-            code: Some(code),
-            text,
-        }]));
+    pub(crate) fn suggestion(mut self, suggestion: impl Into<String>) -> Self {
+        self.suggestion = Some(suggestion.into().into_boxed_str());
         self
     }
 
-    pub(crate) fn pin_command_cause(mut self, code: Option<i32>, text: Option<String>) -> Self {
-        self.cause = Some(Box::new([Cause {
-            source: "pin_command",
-            code,
-            text,
-        }]));
+    pub(crate) fn cause(
+        mut self,
+        source: &'static str,
+        code: Option<i32>,
+        text: Option<String>,
+    ) -> Self {
+        self.cause.push(Cause { source, code, text });
         self
+    }
+
+    pub(crate) fn eric_cause(self, code: i32, text: Option<String>) -> Self {
+        self.cause("eric", Some(code), text)
+    }
+
+    pub(crate) fn pin_command_cause(self, code: Option<i32>, text: Option<String>) -> Self {
+        self.cause("pin_command", code, text)
     }
 
     pub(crate) fn write_text(&self, mut out: impl Write) -> io::Result<()> {
@@ -94,7 +106,10 @@ impl Failure {
         if let Some(help) = &self.help {
             writeln!(out, "= help: {help}")?;
         }
-        if let Some([cause]) = self.cause.as_deref() {
+        if let Some(suggestion) = &self.suggestion {
+            writeln!(out, "= help: {suggestion}")?;
+        }
+        for cause in &self.cause {
             write!(out, "= note: {}", cause.source)?;
             if let Some(code) = cause.code {
                 write!(out, " returned {code}")?;

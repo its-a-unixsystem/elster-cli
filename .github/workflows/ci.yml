@@ -5,13 +5,20 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      test_system:
+        description: Run the registered HerstellerID test instead of the reachability probe
+        type: boolean
+        default: false
+  schedule:
+    - cron: '20 6 * * 1'
 
 permissions:
   contents: read
 
 jobs:
   checks:
-    if: ${{ github.event_name != 'workflow_dispatch' && !github.event.deleted }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -52,7 +59,7 @@ jobs:
           arguments: --locked
 
   eric-local:
-    if: ${{ github.event_name != 'workflow_dispatch' && !github.event.deleted }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -73,10 +80,16 @@ jobs:
           export KIECLI_TEST_CERTIFICATE="$tmp/test-softorg-pse.pfx"
           bash .github/scripts/download-test-certificate.sh "$KIECLI_TEST_CERTIFICATE"
           cargo test --locked --test certificate_status inspects_an_official_test_certificate_offline -- --ignored --exact
+          cargo test --locked --test postfach_status rejects_a_test_certificate_in_live_mode -- --ignored --exact
+      - name: Validate the invented Postfach response fixture
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libxml2-utils
+          bash .github/scripts/check-postfach-fixture.sh
 
   # Remove this job once a hosted runner has received the expected ELSTER reply.
   elster-reachability:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.test_system }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -97,3 +110,53 @@ jobs:
           KIECLI_TEST_POSTFACH_SINCE=$(date -u -d yesterday +%Y%m%d)
           export KIECLI_TEST_POSTFACH_SINCE
           cargo test --locked --bin kiecli eric::ci::elster_test_system_is_reachable -- --ignored --exact
+
+  test-system:
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_system)) }}
+    environment: ${{ github.event_name == 'schedule' && 'elster-test-scheduled' || 'elster-test' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-test-eric
+        id: eric
+      - run: cargo build --locked
+      - name: Exercise Postfach status on the ELSTER test system
+        shell: bash
+        env:
+          KIECLI_ERIC_DIR: ${{ steps.eric.outputs.home }}
+          KIECLI_HERSTELLER_ID: ${{ secrets.KIECLI_HERSTELLER_ID }}
+        run: |
+          set -euo pipefail
+          umask 077
+          tmp=$(mktemp -d)
+          trap 'rm -rf -- "$tmp"' EXIT
+          [[ "$KIECLI_HERSTELLER_ID" =~ ^[0-9]{5}$ ]] || {
+            echo 'The ELSTER test environment requires a five-digit HerstellerID secret.' >&2
+            exit 1
+          }
+          export KIECLI_CERTIFICATE="$tmp/test-softorg-pse.pfx"
+          export KIECLI_PIN=123456
+          bash .github/scripts/download-test-certificate.sh "$KIECLI_CERTIFICATE"
+          target/debug/kiecli zertifikat status --test > "$tmp/certificate.json"
+          # Keep the HerstellerID and certificate CN out of logs, including on a match.
+          jq -er 'select(.testzertifikat == true) | .konto_id | select(type == "string" and length > 0)' \
+            "$tmp/certificate.json" > "$tmp/patterns"
+          printf '%s\n' "$KIECLI_HERSTELLER_ID" >> "$tmp/patterns"
+          if git grep --cached -qF -f "$tmp/patterns"; then
+            echo 'Tracked files contain a credential identifier.' >&2
+            exit 1
+          else
+            [[ $? == 1 ]] || exit 1
+          fi
+          target/debug/kiecli postfach status --test --alle --von "$(date -u -d yesterday +%F)" \
+            > "$tmp/status.json" 2> "$tmp/status-error.json" || {
+              echo 'Postfach status failed on the ELSTER test system.' >&2
+              exit 1
+            }
+          jq -e '.test == true and .einschraenkung == "alle" and
+            (.bereitstellungsdatenarten | type == "array" and
+              all(.[]; (.name | type == "string") and (.anzahl | type == "number")))' \
+            "$tmp/status.json" > /dev/null

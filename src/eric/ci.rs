@@ -2,34 +2,13 @@
 // See NOTICE for the ERiC and Otto additional permission.
 
 use std::env;
-use std::ffi::{CString, c_char, c_int, c_void};
+use std::ffi::CString;
 use std::path::PathBuf;
-use std::ptr;
 
 use serde::Deserialize;
 
-use super::{Buffer, Certificate, ERIC_LIB, Session, TERMS_MARKER, load};
+use super::{Certificate, ERIC_LIB, Session, TERMS_MARKER, load};
 use crate::error::Failure;
-
-const VALIDATE: u32 = 1 << 1;
-const SEND: u32 = 1 << 2;
-
-#[repr(C)]
-struct Encryption {
-    version: u32,
-    handle: u32,
-    pin: *const c_char,
-}
-
-type Process = unsafe extern "C" fn(
-    *const c_char,
-    *const c_char,
-    u32,
-    *const c_void,
-    *const Encryption,
-    *mut c_void,
-    *mut c_void,
-) -> c_int;
 
 fn fail<T>(failure: Failure) -> T {
     panic!(
@@ -59,7 +38,7 @@ fn postfach_status(
     since: &str,
     hersteller_id: &str,
     certificate: Option<&Certificate<'_>>,
-) -> (c_int, Option<u32>) {
+) -> (i32, Option<u32>) {
     assert!(since.len() == 8 && since.bytes().all(|byte| byte.is_ascii_digit()));
     // 700000004 is valid locally but deliberately rejected by ELSTER through ERiC.
     let xml = CString::new(format!(
@@ -79,31 +58,23 @@ fn postfach_status(
 </Nutzdatenblock></DatenTeil>
 </Elster>"#
     )).expect("NUL-free probe XML");
-    // SAFETY: the checked ERiC 44 major uses this signature, without a transfer handle.
-    let process = unsafe { session.library.get::<Process>(b"EricBearbeiteVorgang\0") }
-        .expect("EricBearbeiteVorgang");
-    let result = Buffer::new(&session.library).unwrap_or_else(fail);
-    let server = Buffer::new(&session.library).unwrap_or_else(fail);
-    let encryption = certificate.map(|certificate| Encryption {
-        version: 3,
-        handle: certificate.handle,
-        pin: c"123456".as_ptr(),
-    });
-    let flags = VALIDATE | if certificate.is_some() { SEND } else { 0 };
-    // SAFETY: all pointers are live until the synchronous call returns. Null print parameters
-    // and a null encryption parameter for local validation are supported by ERiC.
-    let code = unsafe {
-        process(
-            xml.as_ptr(),
-            c"PostfachStatus_32".as_ptr(),
-            flags,
-            ptr::null(),
-            encryption.as_ref().map_or(ptr::null(), ptr::from_ref),
-            result.ptr.as_ptr(),
-            server.ptr.as_ptr(),
+    process_status(session, &xml, certificate)
+}
+
+fn process_status(
+    session: &Session,
+    xml: &std::ffi::CStr,
+    certificate: Option<&Certificate<'_>>,
+) -> (i32, Option<u32>) {
+    session
+        .process(
+            xml,
+            c"PostfachStatus_32",
+            certificate.map(|cert| (cert, c"123456")),
+            &mut None,
+            |code, server, _| Ok((code, server_code(server))),
         )
-    };
-    (code, server.text().and_then(server_code))
+        .unwrap_or_else(fail)
 }
 
 fn server_code(xml: &str) -> Option<u32> {
@@ -136,14 +107,12 @@ fn server_code(xml: &str) -> Option<u32> {
 #[ignore = "requires official ERiC 44; does not contact ELSTER"]
 fn validates_placeholder_hersteller_id_offline() {
     with_session(|session| {
-        assert_eq!(
-            postfach_status(session, "20261124", "12345", None),
-            (0, None)
-        );
-        assert_eq!(
-            postfach_status(session, "20261124", "74931", None),
-            (610301202, None),
-        );
+        let golden = include_str!("../../tests/fixtures/requests/postfach-status.xml");
+        let valid = CString::new(golden).unwrap();
+        let blocked =
+            CString::new(golden.replace("<HerstellerID>12345", "<HerstellerID>74931")).unwrap();
+        assert_eq!(process_status(session, &valid, None), (0, None));
+        assert_eq!(process_status(session, &blocked, None), (610301202, None),);
     });
 }
 

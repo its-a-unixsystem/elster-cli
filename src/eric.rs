@@ -71,12 +71,30 @@ type OpenCertificate = unsafe extern "C" fn(*mut u32, *mut u32, *const c_char) -
 type CloseCertificate = unsafe extern "C" fn(u32) -> c_int;
 type CertificateProperties = unsafe extern "C" fn(u32, *const c_char, *mut c_void) -> c_int;
 
+#[repr(C)]
+struct Encryption {
+    version: u32,
+    handle: u32,
+    pin: *const c_char,
+}
+
+type Process = unsafe extern "C" fn(
+    *const c_char,
+    *const c_char,
+    u32,
+    *const c_void,
+    *const Encryption,
+    *mut c_void,
+    *mut c_void,
+) -> c_int;
+
 pub(crate) struct Session {
     library: Library,
     end: Option<End>,
 }
 
-struct Certificate<'lib> {
+pub(crate) struct Certificate<'lib> {
+    session: &'lib Session,
     handle: u32,
     close: Symbol<'lib, CloseCertificate>,
 }
@@ -216,7 +234,115 @@ impl Session {
         if code != 0 {
             return Err(self.certificate_error(code));
         }
-        Ok(Certificate { handle, close })
+        Ok(Certificate {
+            session: self,
+            handle,
+            close,
+        })
+    }
+
+    pub(crate) fn with_certificate<T>(
+        &self,
+        path: &Path,
+        trace: &mut Option<Vec<TraceEvent>>,
+        run: impl FnOnce(&Certificate<'_>, &mut Option<Vec<TraceEvent>>) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        let cert = timed(trace, "EricGetHandleToCertificate", || {
+            self.open_certificate(path)
+        })?;
+        let result = run(&cert, trace);
+        timed(trace, "EricCloseHandleToCertificate", || drop(cert));
+        result
+    }
+
+    pub(crate) fn process<T>(
+        &self,
+        xml: &CStr,
+        datenart_version: &CStr,
+        auth: Option<(&Certificate<'_>, &CStr)>,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(i32, &str, Option<String>) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        const VALIDATE: u32 = 1 << 1;
+        const SEND: u32 = 1 << 2;
+        let flags = VALIDATE | if auth.is_some() { SEND } else { 0 };
+        let encryption = auth.map(|(cert, pin)| {
+            assert!(std::ptr::eq(self, cert.session));
+            Encryption {
+                version: 3,
+                handle: cert.handle,
+                pin: pin.as_ptr(),
+            }
+        });
+        // SAFETY: the checked ERiC 44 ABI uses this signature, without a transfer handle.
+        let process = unsafe { self.library.get::<Process>(b"EricBearbeiteVorgang\0") }
+            .map_err(symbol_error)?;
+        let result = Buffer::new(&self.library)?;
+        let server = Buffer::new(&self.library)?;
+        let code = timed(trace, "EricBearbeiteVorgang", || {
+            // SAFETY: all parameters outlive this synchronous call. Printing is disabled.
+            // For local validation without sending, the encryption pointer can be null.
+            unsafe {
+                process(
+                    xml.as_ptr(),
+                    datenart_version.as_ptr(),
+                    flags,
+                    std::ptr::null(),
+                    encryption
+                        .as_ref()
+                        .map_or(std::ptr::null(), std::ptr::from_ref),
+                    result.ptr.as_ptr(),
+                    server.ptr.as_ptr(),
+                )
+            }
+        });
+        read(
+            code,
+            server.text().unwrap_or_default(),
+            (code != 0).then(|| self.error_text(code)).flatten(),
+        )
+    }
+}
+
+pub(crate) trait AuthenticatedEric {
+    fn inspect<T>(
+        &self,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(&str) -> Result<T, Failure>,
+    ) -> Result<T, Failure>;
+
+    fn send<T>(
+        &self,
+        xml: &CStr,
+        datenart_version: &CStr,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(i32, &str, Option<String>) -> Result<T, Failure>,
+    ) -> Result<T, Failure>;
+}
+
+impl AuthenticatedEric for (&Certificate<'_>, &crate::pin::Pin) {
+    fn inspect<T>(
+        &self,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(&str) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        self.0.inspect(self.1, trace, read)
+    }
+
+    fn send<T>(
+        &self,
+        xml: &CStr,
+        datenart_version: &CStr,
+        trace: &mut Option<Vec<TraceEvent>>,
+        read: impl FnOnce(i32, &str, Option<String>) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
+        self.0.session.process(
+            xml,
+            datenart_version,
+            Some((self.0, self.1.as_c_str())),
+            trace,
+            read,
+        )
     }
 }
 
@@ -238,23 +364,31 @@ impl CertificateReader for Session {
         trace: &mut Option<Vec<TraceEvent>>,
         parse: impl FnOnce(&str) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
-        let cert = timed(trace, "EricGetHandleToCertificate", || {
-            self.open_certificate(path)
-        })?;
+        self.with_certificate(path, trace, |cert, trace| cert.inspect(pin, trace, parse))
+    }
+}
+
+impl Certificate<'_> {
+    pub(crate) fn inspect<T>(
+        &self,
+        pin: &crate::pin::Pin,
+        trace: &mut Option<Vec<TraceEvent>>,
+        parse: impl FnOnce(&str) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
         // SAFETY: this is the ERiC 44 certificate properties ABI.
         let properties = unsafe {
-            self.library
+            self.session
+                .library
                 .get::<CertificateProperties>(b"EricHoleZertifikatEigenschaften\0")
         }
         .map_err(symbol_error)?;
-        let buffer = Buffer::new(&self.library)?;
+        let buffer = Buffer::new(&self.session.library)?;
         let code = timed(trace, "EricHoleZertifikatEigenschaften", || {
             // SAFETY: the certificate, PIN and buffer are live for this synchronous call.
-            unsafe { properties(cert.handle, pin.as_c_str().as_ptr(), buffer.ptr.as_ptr()) }
+            unsafe { properties(self.handle, pin.as_c_str().as_ptr(), buffer.ptr.as_ptr()) }
         });
-        timed(trace, "EricCloseHandleToCertificate", || drop(cert));
         if code != 0 {
-            return Err(self.certificate_error(code));
+            return Err(self.session.certificate_error(code));
         }
         parse(buffer.text().ok_or_else(|| {
             Failure::new(

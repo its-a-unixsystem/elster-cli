@@ -263,7 +263,41 @@ impl Layers {
             warnings: self.warnings,
         }
     }
+
+    fn hersteller_id(&mut self, cli: &Cli) -> Result<Resolved<Option<String>>, Failure> {
+        let setting: Resolved<Option<String>> = select(
+            cli.hersteller_id.clone(),
+            || read_env("KIECLI_HERSTELLER_ID"),
+            self.hersteller_id
+                .take()
+                .map(Value::try_into)
+                .transpose()
+                .map_err(|_| {
+                    Failure::new(
+                        3,
+                        "config_invalid",
+                        "Invalid HerstellerID setting type in the config file",
+                    )
+                })?,
+        )?;
+        if setting
+            .value
+            .as_ref()
+            .is_some_and(|id| id.len() != 5 || !id.bytes().all(|byte| byte.is_ascii_digit()))
+        {
+            return Err(Failure::new(
+                3,
+                "hersteller_id_invalid",
+                "HerstellerID must be five digits",
+            )
+            .help(HERSTELLER_ID_HELP));
+        }
+        Ok(setting)
+    }
 }
+
+const HERSTELLER_ID_HELP: &str =
+    "Set --hersteller-id, KIECLI_HERSTELLER_ID or hersteller_id in the config file.";
 
 fn env_path(key: &str) -> Option<PathBuf> {
     env::var_os(key).map(PathBuf::from)
@@ -320,6 +354,23 @@ pub(crate) fn certificate_settings(
     cli: &Cli,
 ) -> Result<(Settings, PathBuf, crate::pin::Pin), Failure> {
     let mut layers = Layers::load(cli)?;
+    let (path, pin) = credentials(cli, &mut layers)?;
+    Ok((layers.into_settings(), path, pin))
+}
+
+pub(crate) fn request_settings(
+    cli: &Cli,
+) -> Result<(Settings, PathBuf, crate::pin::Pin, String), Failure> {
+    let mut layers = Layers::load(cli)?;
+    let id = layers.hersteller_id(cli)?.value.ok_or_else(|| {
+        Failure::new(3, "hersteller_id_missing", "No HerstellerID was supplied")
+            .note(HERSTELLER_ID_HELP)
+    })?;
+    let (path, pin) = credentials(cli, &mut layers)?;
+    Ok((layers.into_settings(), path, pin, id))
+}
+
+fn credentials(cli: &Cli, layers: &mut Layers) -> Result<(PathBuf, crate::pin::Pin), Failure> {
     let mut credentials: CredentialConfig = std::mem::take(&mut layers.selected.details)
         .try_into()
         .map_err(|_| {
@@ -362,7 +413,7 @@ pub(crate) fn certificate_settings(
             .note("Set KIECLI_PIN, or use a PIN file (--pin-file, KIECLI_PIN_FILE, pin_file) or a PIN command (--pin-command, KIECLI_PIN_COMMAND, pin_command).")),
     };
     let pin = pin.read(&mut layers.warnings)?;
-    Ok((layers.into_settings(), certificate, pin))
+    Ok((certificate, pin))
 }
 
 pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
@@ -393,27 +444,7 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
         "KIECLI_BUNDESLAND overrides the profile's bundesland setting",
         &mut layers.warnings,
     )?;
-    let hersteller_id = select(
-        cli.hersteller_id.clone(),
-        || read_env("KIECLI_HERSTELLER_ID"),
-        layers
-            .hersteller_id
-            .map(Value::try_into)
-            .transpose()
-            .map_err(|_| invalid())?,
-    )?;
-    if hersteller_id
-        .value
-        .as_ref()
-        .is_some_and(|id| id.len() != 5 || !id.bytes().all(|byte| byte.is_ascii_digit()))
-    {
-        return Err(Failure::new(
-            3,
-            "hersteller_id_invalid",
-            "HerstellerID must be five digits",
-        )
-        .help("Set --hersteller-id, KIECLI_HERSTELLER_ID or hersteller_id in the config file."));
-    }
+    let hersteller_id = layers.hersteller_id(cli)?;
     let pin_channel = pin.value.as_ref().map(crate::pin::Source::channel);
 
     let file_source = layers

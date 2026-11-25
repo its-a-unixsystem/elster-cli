@@ -137,9 +137,11 @@ impl Properties {
         pin: &Pin,
         trace: &mut Option<Vec<TraceEvent>>,
     ) -> Result<Self, Failure> {
-        reader.inspect_certificate(path, pin, trace, |xml| {
-            quick_xml::de::from_str(xml).map_err(|_| invalid_properties())
-        })
+        reader.inspect_certificate(path, pin, trace, Self::from_xml)
+    }
+
+    fn from_xml(xml: &str) -> Result<Self, Failure> {
+        quick_xml::de::from_str(xml).map_err(|_| invalid_properties())
     }
 
     fn report(
@@ -201,6 +203,44 @@ impl Properties {
             trace,
         })
     }
+}
+
+pub(crate) fn check_for_request(
+    xml: &str,
+    now: OffsetDateTime,
+    warnings: &mut Vec<Warning>,
+) -> Result<bool, Failure> {
+    let properties = Properties::from_xml(xml)?;
+    let blocks = || {
+        properties
+            .signature
+            .iter()
+            .chain(properties.encryption.iter())
+    };
+    let expiry = blocks()
+        .map(|block| block.gueltig_bis)
+        .min()
+        .ok_or_else(invalid_properties)?;
+    if now > expiry {
+        return Err(
+            Failure::new(3, "certificate_expired", "The Certificate is expired")
+                .help("Renew the Certificate in Mein ELSTER."),
+        );
+    }
+    if blocks().any(|block| now < block.gueltig_ab) {
+        return Err(Failure::new(
+            3,
+            "certificate_not_yet_valid",
+            "The Certificate is not yet valid",
+        ));
+    }
+    if expiry - now < Duration::days(60) {
+        warnings.push(Warning::new(
+            "certificate_expires_soon",
+            "The Certificate expires in less than 60 days",
+        ));
+    }
+    Ok(blocks().any(|block| block.testzertifikat == Some(true)))
 }
 
 impl Status<'_> {

@@ -6,6 +6,7 @@ mod config;
 mod eric;
 mod error;
 mod pin;
+mod postfach;
 mod version;
 
 use std::io::{self, Write};
@@ -82,6 +83,11 @@ enum Command {
     Zertifikat {
         #[command(subcommand)]
         command: CertificateCommand,
+    },
+    /// Read the Taxpayer's Postfach.
+    Postfach {
+        #[command(subcommand)]
+        command: postfach::Command,
     },
 }
 
@@ -177,6 +183,9 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
         Command::Zertifikat {
             command: CertificateCommand::Status,
         } => certificate::status(cli, stdout),
+        Command::Postfach {
+            command: postfach::Command::Status(options),
+        } => postfach::status(cli, options, stdout),
     }
 }
 
