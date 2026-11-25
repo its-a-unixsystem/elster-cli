@@ -1,7 +1,7 @@
 # Test-system spike: ERiC end to end
 
 Type: prototype
-Status: open
+Status: resolved
 Blocked by: 06, 08
 
 ## Question
@@ -21,6 +21,21 @@ From [Certificate inspection](14-certificate-inspection.md), also check: what `E
 From [Testing strategy](15-testing-strategy.md), also check: whether the test Postfach is shared by every Hersteller using the test certificates, and so whether `postfach abholung --bestaetigen` and `bestaetigung` are safe in recurring test-system runs; whether an Abholung on the test system counts toward the 24 h Bestätigung rule for our HerstellerID; and whether GitHub Actions runners (`ubuntu-latest`) can reach the test system (IP blocks, rate limits). Also note that the 44.3.6.0 package's `libericapi.so` reports version 44.3.4.0 in `EricVersion`.
 
 When resolving, also fill the ⏳ items in [spec.md](../spec.md) (its "Pending the spike" table names where each answer lands).
+
+## Answer
+
+**ERiC and Otto work end to end from Rust against the ELSTER test system, with our HerstellerID from day one. The Postfach path is fully verified; the Kontoabfrage is verified up to the authorisation check, because no public test certificate is authorised. The response mapping and the Anhang path are left to the live check.** Details per step under Comments.
+
+1. **Binding:** `libloading` on `libericapi.so`/`libotto.so` by absolute path (`RPATH $ORIGIN`, no `LD_LIBRARY_PATH`), `EricBearbeiteVorgang` in its ERiC ≥ 44 form, `eric_verschluesselungs_parameter_t` version 3. glibc baseline 2.25.
+2. **Certificates:** `EricHoleZertifikatEigenschaften` gives both blocks, `Testzertifikat`, `Registrierertyp` and a 10-digit Konto-ID as CN; dates are GeneralizedTime (ticket 14 amended).
+3. **Postfach:** Testmerker `700000001` only; 49 accepted Bereitstellungsdatenarten instead of table 9.4 (ticket 09 amended); PostfachStatus undercounts; ELSTER rejections arrive as ERiC `610101210`/`610101292` with the real code in the server answer's `RC`; more than 500,000 matches is `190017608`.
+4. **Abholung:** Otto returns plaintext (no `EricDekodiereDaten`) from `objektspeicher.elster.de` for test certificates too; `--neue` keeps a Nachricht until it is confirmed; confirmed Nachrichten stay fetchable; Bestätigung answers per id, also when ERiC reports an error, and repeating it is harmless.
+5. **Test system:** the Postfach of the test Organisationszertifikat is shared by every Hersteller (over 800,000 entries). Test runs pass `--von` and fetch and confirm only Nachrichten already confirmed by someone else (ticket 15 amended).
+6. **Kontoabfrage:** `230077012` for the test Organisationszertifikat with any Steuernummer, `130025001` for personal test certificates; activation of the Steuerkontoabfrage in Mein ELSTER clears it on a real account (ticket 13 amended).
+7. **Error codes** for wrong PIN (ERiC and Otto), blocked, empty and foreign HerstellerID, test certificate sent live, unknown and malformed Otto objects, all mapped in spec §8.
+8. **Not settled here, decided instead:** an OTTER 503 is taken to be `OTTO_TRANSFER_SERVER_FEHLER` (610403009) as `otto_statuscode.h` suggests; GitHub runner reachability is checked by a job in the build's first CI PR, with the placeholder HerstellerID `12345` (`601015001` proves the server answered).
+
+The spike code stayed outside the repository. All its ⏳ items are filled in [spec.md](../spec.md).
 
 ## Comments
 

@@ -1,6 +1,6 @@
 # KIECLI v1 specification
 
-Status: **draft**. Items marked ⏳ wait on [Test-system spike: ERiC end to end](issues/11-test-system-spike.md). [Pending the spike](#15-pending-the-spike) lists all of them. Everything else is decided.
+Status: **implementation-ready** (2026-11-25). Everything is decided; the [Test-system spike: ERiC end to end](issues/11-test-system-spike.md) filled the last open items.
 
 This spec assembles the decisions of the [KIECLI v1 map](map.md). Each section names the ticket that holds the reasoning; where this spec and a ticket disagree, the ticket wins and this spec is wrong. Domain terms follow [`GLOSSARY.md`](../../GLOSSARY.md).
 
@@ -368,7 +368,7 @@ For `230077012` and `950017011`, `help` says the Steuerkontoabfrage must be acti
   | `610405831` (wrong PIN in Otto) | Otto, local | `pin_wrong` |
 
 - **Otto** (`cause` carries Otto's code and text): `610403008` (object not found on the OTTER server) and `610405001` (invalid parameter, a malformed object id) are exit 5. `objektGroesse` is not checked by Otto, so a wrong size is no error.
-- Otto transport failures by name from `otto_statuscode.h`: `OTTO_TRANSFER_CONNECTSERVER` (610403003), `OTTO_TRANSFER_TIMEOUT` (610403005) and `OTTO_TRANSFER_SERVER_FEHLER` (610403009) are exit 6 with `retry: true`; `OTTO_TRANSFER_UNAUTHORIZED` (610403007) is exit 3. ⏳ That an OTTER 503 surfaces as `OTTO_TRANSFER_SERVER_FEHLER` is the header's reading only; it could not be provoked on the test system.
+- Otto transport failures by name from `otto_statuscode.h`: `OTTO_TRANSFER_CONNECTSERVER` (610403003), `OTTO_TRANSFER_TIMEOUT` (610403005) and `OTTO_TRANSFER_SERVER_FEHLER` (610403009) are exit 6 with `retry: true`; `OTTO_TRANSFER_UNAUTHORIZED` (610403007) is exit 3. An OTTER 503 is taken to surface as `OTTO_TRANSFER_SERVER_FEHLER`, as the header suggests; the spike could not provoke one. If the build or a live run shows another code, the mapping follows it.
 - **Error-code names:** codes the tickets name are used as written: `datenart_unknown`, the certificate codes in §8.1, and `test_certificate_requires_testmerker`. Codes for the other conditions in §3–§5 are named in the build, in the same style (snake_case, glossary terms in German, otherwise English), and are all listed in `describe`.
 
 ## 9. Diagnostics
@@ -448,7 +448,7 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
   - Always: `zertifikat status`, `postfach status`, `postfach anfrage`, all three `kontoabfrage` kinds, and the live-call refusal. The `kontoabfrage` runs use the test Organisationszertifikat and expect exit 5 with `230077012`, the only answer the test system gives; they prove request format and transport, not the response mapping.
   - The test Postfach is shared by every Hersteller using the test Organisationszertifikat (over 800,000 entries, about 300 new a day), so every Postfach call passes `--von` (yesterday).
   - `postfach abholung --bestaetigen` and `postfach bestaetigung` run on one Nachricht that is already confirmed: listed in `alle` but not in `--neue`. Other Hersteller drain the test Postfach within hours, so there is always one. Fetching and confirming it again changes nothing for anyone else, while confirming a new one would hide it from another Hersteller's `--neue`. Whether a test-system Abholung counts toward our 24 h obligation is moot, because the run always confirms. Never `--ohne-bestaetigung` without a Bestätigung in the same run.
-  - ⏳ If GitHub's runners cannot reach the test system, the same command runs on the maintainer's machine before each release, and the CI triggers are dropped.
+  - Runner reachability is checked in the build's first CI PR by a one-off job that sends a PostfachStatus with the placeholder HerstellerID `12345` and expects `601015001` (the server answered). If GitHub's runners cannot reach the test system, the same command runs on the maintainer's machine before each release, and the CI triggers are dropped.
 - **Leak guard:** whenever `KIECLI_HERSTELLER_ID` is set, a test scans every tracked file for that value and for the subject CN of the Certificate in `KIECLI_CERTIFICATE`, and fails on a hit.
 
 ### 12.5 Final live check
@@ -502,16 +502,7 @@ tests/fixtures/{elster,eric,requests}/  tests/downloads.toml
 .github/workflows/  .github/pull_request_template.md
 ```
 
-## 15. Pending the spike
-
-Each item names where its answer lands in this spec.
-
-| Question | Lands in |
-|---|---|
-| That an OTTER 503 surfaces as `OTTO_TRANSFER_SERVER_FEHLER` | §8.3 |
-| Whether GitHub runners reach the test system | §12.4 |
-
-## 16. Sources
+## 15. Sources
 
 | Ticket | Sections |
 |---|---|
@@ -526,4 +517,5 @@ Each item names where its answer lands in this spec.
 | [Certificate inspection](issues/14-certificate-inspection.md) | §5.3, §6.2, §8.1 |
 | [Testing strategy](issues/15-testing-strategy.md) | §2.4, §12 |
 | [Distribution](issues/16-distribution.md) | §3.5, §13 |
+| [Test-system spike: ERiC end to end](issues/11-test-system-spike.md) | §2, §4, §5.1, §5.2, §6.3, §7, §8, §12.4, §12.5 |
 | [Open-interface transport, end to end](issues/01-open-interface-transport.md), [ERiC and the Kontoabfrage](issues/03-eric-kontoabfrage.md), [Go vs Rust library support](issues/05-go-vs-rust-libraries.md) | background only (superseded by the ERiC decision) |
