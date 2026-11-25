@@ -123,7 +123,7 @@ jobs:
       - uses: ./.github/actions/install-test-eric
         id: eric
       - run: cargo build --locked
-      - name: Exercise Postfach status and Anfrage on the ELSTER test system
+      - name: Exercise the Postfach lifecycle on the ELSTER test system
         shell: bash
         env:
           KIECLI_ERIC_DIR: ${{ steps.eric.outputs.home }}
@@ -171,3 +171,36 @@ jobs:
               all(.[]; (.id | type == "string") and (.bereitstellungsdatenart | type == "string")) and
               (map(.id) == (map(.id) | sort)))' \
             "$tmp/anfrage.json" > /dev/null
+          target/debug/kiecli postfach anfrage --test --neue --von "$since" \
+            > "$tmp/neue.json" 2> "$tmp/neue-error.json" || {
+              echo 'Postfach Anfrage for unconfirmed Nachrichten failed.' >&2
+              exit 1
+            }
+          # Never collect or confirm an unconfirmed Nachricht in the shared test Postfach.
+          id=$(jq -er --slurpfile neue "$tmp/neue.json" '
+            ($neue[0].postfach_nachrichten | map({key: .id, value: true}) | from_entries) as $unconfirmed |
+            first(.postfach_nachrichten[] |
+              select(($unconfirmed[.id] | not) and (.datenpaket != null or (.anhaenge | length > 0))) |
+              .id)
+          ' "$tmp/anfrage.json") || {
+            echo 'No already confirmed Nachricht with files found in the shared test Postfach.' >&2
+            exit 1
+          }
+          target/debug/kiecli postfach abholung --test --id "$id" --von "$since" \
+            --out "$tmp/files" --bestaetigen > "$tmp/abholung.json" 2> "$tmp/abholung-error.json" || {
+              echo 'Postfach Abholung or its Bestätigung failed on the ELSTER test system.' >&2
+              exit 1
+            }
+          jq -e --arg id "$id" '.test and
+            (.postfach_nachrichten | length == 1 and
+             .[0].id == $id and .[0].status == "vollstaendig" and
+             .[0].bestaetigt and (.[0].files | length > 0))' "$tmp/abholung.json" > /dev/null
+          target/debug/kiecli postfach bestaetigung --test --id "$id" \
+            > "$tmp/bestaetigung.json" 2> "$tmp/bestaetigung-error.json" || {
+              echo 'Standalone Postfach Bestätigung failed on the ELSTER test system.' >&2
+              exit 1
+            }
+          jq -e --arg id "$id" '.test and
+            (.postfach_nachrichten | length == 1 and
+             .[0].id == $id and .[0].bestaetigt and .[0].rueckgabe.code == 0)' \
+            "$tmp/bestaetigung.json" > /dev/null

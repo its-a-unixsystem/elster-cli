@@ -4,6 +4,7 @@
 #[cfg(test)]
 mod ci;
 pub(crate) mod install;
+mod otto;
 
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")))]
 compile_error!("KIECLI v1 requires x86_64 Linux with glibc");
@@ -92,6 +93,8 @@ type Process = unsafe extern "C" fn(
 
 pub(crate) struct Session {
     library: Library,
+    logs: CString,
+    otto: Option<otto::Api>,
     end: Option<End>,
 }
 
@@ -185,6 +188,8 @@ impl Session {
         }
         Ok(Self {
             library,
+            logs,
+            otto: None,
             end: Some(end),
         })
     }
@@ -306,6 +311,16 @@ impl Session {
     }
 }
 
+pub(crate) trait ObjectFetcher {
+    fn fetch(
+        &self,
+        object_id: &str,
+        transport_size: u64,
+        out: &mut dyn std::io::Write,
+        trace: &mut Option<Vec<TraceEvent>>,
+    ) -> Result<(), Failure>;
+}
+
 pub(crate) trait AuthenticatedEric {
     fn inspect<T>(
         &self,
@@ -404,6 +419,20 @@ impl Certificate<'_> {
 }
 
 impl Session {
+    pub(crate) fn otto<'a>(
+        &'a self,
+        certificate: &Path,
+        pin: &'a crate::pin::Pin,
+        hersteller_id: &str,
+        trace: &mut Option<Vec<TraceEvent>>,
+    ) -> Result<impl ObjectFetcher + 'a + use<'a>, Failure> {
+        // Probe completes the Otto symbol checks before exposing the session.
+        self.otto
+            .as_ref()
+            .expect("the session's Otto library is loaded")
+            .fetcher(&self.logs, certificate, pin, hersteller_id, trace)
+    }
+
     fn certificate_error(&self, code: c_int) -> Failure {
         let (exit, code_name, message) = match code {
             610201106 => (3, "pin_wrong", "The Certificate PIN is incorrect"),
@@ -519,7 +548,7 @@ impl Probe {
         };
         let logs = std::path::absolute(logs).map_err(|err| log_error(logs, err))?;
         let plugins = dir.join("lib/plugins");
-        let session = timed(&mut self.trace, "EricInitialisiere", || {
+        let mut session = timed(&mut self.trace, "EricInitialisiere", || {
             Session::start(library, &plugins, &logs)
         })?;
         let [major, minor, patch, build] =
@@ -538,9 +567,9 @@ impl Probe {
             .help(INSTALL_HELP));
         }
         require_library(&self.library_paths.otto)?;
-        timed(&mut self.trace, "load Otto", || {
-            check_otto(&self.library_paths.otto)
-        })?;
+        session.otto = Some(timed(&mut self.trace, "load Otto", || {
+            otto::Api::load(&self.library_paths.otto)
+        })?);
         let result = run(&session, &mut self.trace);
         let finished = timed(&mut self.trace, "EricBeende", || session.finish());
         let value = result?;
@@ -582,26 +611,6 @@ pub(crate) fn installed_dir(root: &Path) -> Result<Option<PathBuf>, Failure> {
         )
         .help(INSTALL_HELP))
     }
-}
-
-fn check_otto(path: &Path) -> Result<(), Failure> {
-    let library = load(path)?;
-    // Resolve opaque addresses only: the status probe never calls Otto.
-    for symbol in [
-        c"OttoInstanzErzeugen",
-        c"OttoInstanzFreigeben",
-        c"OttoDatenAbholen",
-        c"OttoHoleFehlertext",
-        c"OttoRueckgabepufferErzeugen",
-        c"OttoRueckgabepufferInhalt",
-        c"OttoRueckgabepufferGroesse",
-        c"OttoRueckgabepufferFreigeben",
-    ] {
-        // SAFETY: we look up each symbol as an opaque pointer and don't dereference or call it.
-        unsafe { library.get::<*const c_void>(symbol.to_bytes_with_nul()) }
-            .map_err(symbol_error)?;
-    }
-    Ok(())
 }
 
 fn timed<T>(trace: &mut Option<Vec<TraceEvent>>, call: &'static str, f: impl FnOnce() -> T) -> T {

@@ -16,7 +16,7 @@ Written KIECLI in prose; the command, crate and repository are lowercase `kiecli
 
 ## Status
 
-`eric install`, `eric status`, `config show`, `zertifikat status`, `postfach status`, and `postfach anfrage` are available. `zertifikat status` needs a Certificate and PIN; Postfach commands also need a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
+`eric install`, `eric status`, `config show`, `zertifikat status`, and `postfach status|anfrage|abholung|bestaetigung` are available. `zertifikat status` needs a Certificate and PIN; Postfach commands also need a HerstellerID. The [v1 specification](.scratch/kiecli/spec.md), [glossary](GLOSSARY.md) and [design decisions](docs/adr/) describe the rest of v1.
 
 On Linux x86_64 with `libgcc_s.so.1` installed, review `lizenz.pdf` inside the [official ERiC package](https://download.elster.de/download/eric/eric_44/ERiC-44.3.6.0-Linux-x86_64.jar) (a ZIP archive) and the [tax administration's data-protection notice](https://www.elster.de/eportal/helpGlobal?themaGlobal=datenschutz_public#ds_steuerverw). If you accept the terms:
 
@@ -58,6 +58,14 @@ Run `cargo run -- postfach status --profile NAME --von YYYY-MM-DD` to ask ELSTER
 
 Run `cargo run -- postfach anfrage --profile NAME --von YYYY-MM-DD` to list Postfach-Nachrichten. It asks ELSTER directly rather than relying on `postfach status`, follows all pages, and returns metadata in ID order without collecting or confirming anything. The default is `--neue`; use `--alle` for already confirmed Nachrichten too. Repeat `--datenart NAME` to limit what ELSTER searches. Use `--test` with a test Certificate.
 
+## Collecting and confirming Postfach files
+
+Run `cargo run -- postfach abholung --id ID --out DIR --bestaetigen` to write the Datenpaket and Anhänge to a directory you control, then confirm receipt only once every file for that Nachricht is safely written. IDs come from `postfach anfrage`; repeat `--id` for multiple Nachrichten or use `--neue` to collect all unconfirmed Nachrichten in the selected range. Use `--von` and `--bis` to narrow the search in a large Postfach. Add `--mit-meta` for the Anfrage metadata on stdout. File contents stay on disk; no separate metadata file is created.
+
+Use an output directory you own. The CLI refuses Postfach output directories writable by group or others, and does not follow symlinks at Nachricht or Anhang directories.
+
+Use `--ohne-bestaetigung` instead to defer confirmation, then run `cargo run -- postfach bestaetigung --id ID` before the reported `bestaetigung_faellig_bis` (24 hours after collection starts). On exit 7, inspect each Nachricht: a partial Abholung is not confirmed but still has a deadline. Retry that ID; if retries keep failing, confirm before the deadline to avoid ELSTER blocking the HerstellerID. Neither command silently switches into test mode.
+
 ## Continuous integration
 
 CI checks formatting, Clippy, tests, dependency licences and advisories, and
@@ -68,8 +76,9 @@ and the placeholder HerstellerID `12345`. It sends one read-only PostfachStatus
 and expects ELSTER's `601015001` reply. ELSTER files remain on the ephemeral
 runner and are not uploaded to caches or artifacts.
 
-To exercise `postfach status` and `postfach anfrage` against the ELSTER test
-system, dispatch CI on `main` with `test_system` enabled. The `elster-test`
+To exercise the Postfach lifecycle against the ELSTER test system, dispatch
+CI on `main` with `test_system` enabled. CI collects and re-confirms only a
+Nachricht that is already confirmed in the shared test Postfach. The `elster-test`
 environment must supply the `KIECLI_HERSTELLER_ID` secret and require maintainer
 approval. The weekly `main` run uses the same secret from
 `elster-test-scheduled`. Neither job sends a live request.

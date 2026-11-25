@@ -3,6 +3,7 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::io::{self, Write};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -18,6 +19,17 @@ pub(super) fn execute(
     test: bool,
     trace: &mut Option<Vec<TraceEvent>>,
 ) -> Result<Vec<Nachricht>, Failure> {
+    execute_selected(scope, eric, hersteller_id, test, &BTreeSet::new(), trace)
+}
+
+pub(super) fn execute_selected(
+    scope: &Scope,
+    eric: &impl AuthenticatedEric,
+    hersteller_id: &str,
+    test: bool,
+    ids: &BTreeSet<&str>,
+    trace: &mut Option<Vec<TraceEvent>>,
+) -> Result<Vec<Nachricht>, Failure> {
     let operation = Operation::Anfrage;
     let mut nachrichten = Vec::new();
     let mut cursor = None::<String>;
@@ -25,7 +37,7 @@ pub(super) fn execute(
         let trace_start = trace.as_ref().map_or(0, Vec::len);
         let request = scope.request(operation, hersteller_id, test, cursor.as_deref());
         let next = eric.send(&request, c"PostfachAnfrage_32", trace, |code, xml, text| {
-            read_page(scope, code, xml, text, &mut nachrichten)
+            read_page(scope, code, xml, text, ids, &mut nachrichten)
         })?;
         if let Some(event) = trace
             .as_mut()
@@ -34,6 +46,9 @@ pub(super) fn execute(
             event.page = Some(page);
         }
         let Some(next) = next else { break };
+        if ids.last().is_some_and(|last| next.as_str() >= *last) {
+            break;
+        }
         // The server defines the cursor as a lexicographically increasing ID.
         if next.is_empty() || cursor.as_ref().is_some_and(|previous| next <= *previous) {
             return Err(operation
@@ -51,6 +66,7 @@ fn read_page(
     code: i32,
     xml: &str,
     text: Option<String>,
+    ids: &BTreeSet<&str>,
     nachrichten: &mut Vec<Nachricht>,
 ) -> Result<Option<String>, Failure> {
     let operation = Operation::Anfrage;
@@ -76,7 +92,9 @@ fn read_page(
             .find(|name| *name == group.name)
             .ok_or_else(|| operation.invalid_reply())?;
         for message in group.messages.into_iter().flat_map(|list| list.messages) {
-            nachrichten.push(message.into_nachricht(datenart)?);
+            if ids.is_empty() || ids.contains(message.id.as_str()) {
+                nachrichten.push(message.into_nachricht(datenart)?);
+            }
         }
     }
     Ok(page.cursor)
@@ -237,7 +255,13 @@ struct AttachmentMeta {
 
 #[derive(Serialize)]
 pub(super) struct Nachricht {
-    id: String,
+    pub(super) id: String,
+    #[serde(flatten)]
+    pub(super) details: Details,
+}
+
+#[derive(Serialize)]
+pub(super) struct Details {
     bereitstellungsdatenart: &'static str,
     bereitstellungsticket: Option<String>,
     verfuegbar_bis: Option<String>,
@@ -245,8 +269,8 @@ pub(super) struct Nachricht {
     meta: BTreeMap<String, String>,
     anschreiben: Option<Anschreiben>,
     meta_maps: Vec<MetaMap>,
-    datenpaket: Option<Datenpaket>,
-    anhaenge: Vec<Anhang>,
+    pub(super) datenpaket: Option<Datenpaket>,
+    pub(super) anhaenge: Vec<Anhang>,
 }
 
 #[derive(Default, Serialize)]
@@ -257,20 +281,20 @@ struct Anschreiben {
 }
 
 #[derive(Serialize)]
-struct Datenpaket {
-    objektid: String,
-    encoding: String,
-    groesse: u64,
+pub(super) struct Datenpaket {
+    pub(super) objektid: String,
+    pub(super) encoding: String,
+    pub(super) groesse: u64,
 }
 
 #[derive(Serialize)]
-struct Anhang {
-    position: usize,
-    dateiname: Option<String>,
+pub(super) struct Anhang {
+    pub(super) position: usize,
+    pub(super) dateiname: Option<String>,
     dateibezeichnung: String,
-    dateityp: String,
-    objektid: String,
-    groesse: u64,
+    pub(super) dateityp: String,
+    pub(super) objektid: String,
+    pub(super) groesse: u64,
     meta: Vec<AttachmentMeta>,
 }
 
@@ -333,15 +357,17 @@ impl WireNachricht {
         });
         Ok(Nachricht {
             id: self.id,
-            bereitstellungsdatenart: datenart,
-            bereitstellungsticket: self.bereitstellungsticket,
-            verfuegbar_bis,
-            groesse: self.groesse,
-            meta,
-            anschreiben,
-            meta_maps,
-            datenpaket,
-            anhaenge,
+            details: Details {
+                bereitstellungsdatenart: datenart,
+                bereitstellungsticket: self.bereitstellungsticket,
+                verfuegbar_bis,
+                groesse: self.groesse,
+                meta,
+                anschreiben,
+                meta_maps,
+                datenpaket,
+                anhaenge,
+            },
         })
     }
 }
@@ -386,12 +412,13 @@ impl Nachricht {
             out,
             "{} {}",
             self.id.escape_debug(),
-            self.bereitstellungsdatenart.escape_debug()
+            self.details.bereitstellungsdatenart.escape_debug()
         )?;
-        if let Some(date) = &self.verfuegbar_bis {
+        if let Some(date) = &self.details.verfuegbar_bis {
             write!(out, " (available until {date})")?;
         }
         if let Some(subject) = self
+            .details
             .anschreiben
             .as_ref()
             .and_then(|a| a.bezeichnung.as_deref())

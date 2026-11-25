@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
+mod abholung;
 mod anfrage;
+mod bestaetigung;
 
 #[cfg(test)]
 mod tests;
@@ -25,19 +27,29 @@ pub(crate) enum Command {
     Status(Options),
     /// List Postfach metadata without collecting or confirming Nachrichten.
     Anfrage(Options),
+    /// Collect Datenpakete and Anhänge; explicitly choose whether to confirm them.
+    Abholung(abholung::Options),
+    /// Confirm receipt of the specified Postfach-Nachrichten.
+    Bestaetigung(ConfirmationOptions),
 }
 
 #[derive(Args)]
 pub(crate) struct Options {
-    /// Include only this Bereitstellungsdatenart (repeatable, case-sensitive).
-    #[arg(long, value_name = "NAME")]
-    datenart: Vec<String>,
+    #[command(flatten)]
+    filters: Filters,
     /// Include only Nachrichten not yet confirmed (default).
     #[arg(long, conflicts_with = "alle")]
     neue: bool,
     /// Include already confirmed Nachrichten.
     #[arg(long)]
     alle: bool,
+}
+
+#[derive(Args, Default)]
+struct Filters {
+    /// Include only this Bereitstellungsdatenart (repeatable, case-sensitive).
+    #[arg(long, value_name = "NAME")]
+    datenart: Vec<String>,
     /// Include Nachrichten from this date (YYYY-MM-DD).
     #[arg(long, value_name = "DATE", value_parser = parse_date)]
     von: Option<Date>,
@@ -46,10 +58,34 @@ pub(crate) struct Options {
     bis: Option<Date>,
 }
 
+#[derive(Args)]
+pub(crate) struct ConfirmationOptions {
+    /// Confirm this Postfach-Nachricht ID (repeatable).
+    #[arg(long, required = true, value_name = "ID", value_parser = parse_id)]
+    id: Vec<String>,
+}
+
+fn parse_id(raw: &str) -> Result<String, &'static str> {
+    if safe_id(raw) {
+        Ok(raw.to_owned())
+    } else {
+        Err("expected a Postfach ID containing only ASCII letters, digits, hyphens or underscores")
+    }
+}
+
+fn safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 255
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
 #[derive(Clone, Copy)]
 enum Operation {
     Status,
     Anfrage,
+    Bestaetigung,
 }
 
 impl Operation {
@@ -57,6 +93,7 @@ impl Operation {
         match self {
             Self::Status => "status",
             Self::Anfrage => "anfrage",
+            Self::Bestaetigung => "bestaetigung",
         }
     }
 
@@ -64,6 +101,7 @@ impl Operation {
         match self {
             Self::Status => "PostfachStatus",
             Self::Anfrage => "PostfachAnfrage",
+            Self::Bestaetigung => "PostfachBestaetigung",
         }
     }
 }
@@ -161,10 +199,6 @@ impl Options {
         datenart: Option<(usize, &str)>,
         enable_test: bool,
     ) -> Option<String> {
-        // PIN commands can contain secrets; do not reconstruct the invocation in that case.
-        if cli.pin_command.is_some() {
-            return None;
-        }
         let mut command = format!("kiecli postfach {}", operation.command());
         if self.alle {
             command.push_str(" --alle");
@@ -172,49 +206,65 @@ impl Options {
         if self.neue {
             command.push_str(" --neue");
         }
-        if enable_test || cli.test {
-            command.push_str(" --test");
-        } else if cli.no_test {
-            command.push_str(" --no-test");
-        }
-        if cli.verbose {
-            command.push_str(" -v");
-        }
-        if cli.format == Format::Text {
-            command.push_str(" --format text");
-        }
-        for (flag, date) in [("--von", self.von), ("--bis", self.bis)] {
+        correction(cli, command, Some(&self.filters), datenart, enable_test)
+    }
+}
+
+fn correction(
+    cli: &Cli,
+    mut command: String,
+    filters: Option<&Filters>,
+    datenart: Option<(usize, &str)>,
+    enable_test: bool,
+) -> Option<String> {
+    // PIN commands can contain secrets; do not reconstruct the invocation in that case.
+    if cli.pin_command.is_some() {
+        return None;
+    }
+    if enable_test || cli.test {
+        command.push_str(" --test");
+    } else if cli.no_test {
+        command.push_str(" --no-test");
+    }
+    if cli.verbose {
+        command.push_str(" -v");
+    }
+    if cli.format == Format::Text {
+        command.push_str(" --format text");
+    }
+    if let Some(filters) = filters {
+        for (flag, date) in [("--von", filters.von), ("--bis", filters.bis)] {
             if let Some(date) = date {
                 write!(command, " {flag} {date}").unwrap();
             }
         }
-        for (index, name) in self.datenart.iter().enumerate() {
+        for (index, name) in filters.datenart.iter().enumerate() {
             let value = datenart
                 .filter(|(target, _)| *target == index)
                 .map_or(name.as_str(), |(_, replacement)| replacement);
             append_arg(&mut command, "--datenart", value)?;
         }
-        for (flag, value) in [
-            ("--config", cli.config.as_deref()),
-            ("--eric-dir", cli.eric_dir.as_deref()),
-            ("--eric-log", cli.eric_log.as_deref()),
-            ("--certificate", cli.certificate.as_deref()),
-            ("--pin-file", cli.pin_file.as_deref()),
-        ] {
-            if let Some(value) = value {
-                append_arg(&mut command, flag, value.to_str()?)?;
-            }
-        }
-        for (flag, value) in [
-            ("--profile", cli.profile.as_deref()),
-            ("--hersteller-id", cli.hersteller_id.as_deref()),
-        ] {
-            if let Some(value) = value {
-                append_arg(&mut command, flag, value)?;
-            }
-        }
-        Some(command)
     }
+    for (flag, value) in [
+        ("--config", cli.config.as_deref()),
+        ("--eric-dir", cli.eric_dir.as_deref()),
+        ("--eric-log", cli.eric_log.as_deref()),
+        ("--certificate", cli.certificate.as_deref()),
+        ("--pin-file", cli.pin_file.as_deref()),
+    ] {
+        if let Some(value) = value {
+            append_arg(&mut command, flag, value.to_str()?)?;
+        }
+    }
+    for (flag, value) in [
+        ("--profile", cli.profile.as_deref()),
+        ("--hersteller-id", cli.hersteller_id.as_deref()),
+    ] {
+        if let Some(value) = value {
+            append_arg(&mut command, flag, value)?;
+        }
+    }
+    Some(command)
 }
 
 fn append_arg(command: &mut String, flag: &str, value: &str) -> Option<()> {
@@ -236,15 +286,31 @@ fn append_arg(command: &mut String, flag: &str, value: &str) -> Option<()> {
 
 impl Scope {
     fn new(cli: &Cli, options: &Options, operation: Operation) -> Result<Self, Failure> {
-        if matches!((options.von, options.bis), (Some(von), Some(bis)) if von > bis) {
+        Self::from_filters(
+            &options.filters,
+            if options.alle {
+                Einschraenkung::Alle
+            } else {
+                Einschraenkung::Neue
+            },
+            |index, name| options.correction(cli, operation, Some((index, name)), false),
+        )
+    }
+
+    fn from_filters(
+        filters: &Filters,
+        einschraenkung: Einschraenkung,
+        correction: impl FnOnce(usize, &str) -> Option<String>,
+    ) -> Result<Self, Failure> {
+        if matches!((filters.von, filters.bis), (Some(von), Some(bis)) if von > bis) {
             return Err(Failure::new(
                 2,
                 "usage_error",
                 "--von must not be later than --bis",
             ));
         }
-        let mut datenarten = Vec::with_capacity(options.datenart.len());
-        for (index, name) in options.datenart.iter().enumerate() {
+        let mut datenarten = Vec::with_capacity(filters.datenart.len());
+        for (index, name) in filters.datenart.iter().enumerate() {
             let Some(known) = DATENARTEN.iter().copied().find(|known| known == name) else {
                 let suggestion = DATENARTEN
                     .iter()
@@ -264,25 +330,19 @@ impl Scope {
                 )
                 .note("Bereitstellungsdatenart names are case-sensitive")
                 .help(format!("Did you mean `{suggestion}`? Replace that --datenart value in your original command."));
-                return Err(
-                    match options.correction(cli, operation, Some((index, suggestion)), false) {
-                        Some(command) => failure.suggestion(command),
-                        None => failure,
-                    },
-                );
+                return Err(match correction(index, suggestion) {
+                    Some(command) => failure.suggestion(command),
+                    None => failure,
+                });
             };
             if !datenarten.contains(&known) {
                 datenarten.push(known);
             }
         }
         Ok(Self {
-            einschraenkung: if options.neue || !options.alle {
-                Einschraenkung::Neue
-            } else {
-                Einschraenkung::Alle
-            },
-            von: options.von,
-            bis: options.bis,
+            einschraenkung,
+            von: filters.von,
+            bis: filters.bis,
             datenarten,
         })
     }
@@ -370,52 +430,71 @@ impl Scope {
         cursor: Option<&str>,
     ) -> CString {
         let datenart = operation.datenart();
-        let mut xml = String::with_capacity(1024);
-        write!(xml, r#"<?xml version="1.0" encoding="UTF-8"?>
+        envelope(operation, hersteller_id, test, |xml| {
+            write!(
+                xml,
+                "<{datenart} einschraenkung=\"{}\" rolle=\"inhaber\"",
+                self.einschraenkung.as_str()
+            )
+            .unwrap();
+            for (name, date) in [("von", self.von), ("bis", self.bis)] {
+                if let Some(date) = date {
+                    let (year, month, day) = date.to_calendar_date();
+                    write!(xml, " {name}=\"{year:04}{:02}{day:02}\"", u8::from(month)).unwrap();
+                }
+            }
+            match operation {
+                // PostfachStatus has no Datenart filter on the wire.
+                Operation::Status => xml.push_str("/>\n"),
+                Operation::Anfrage => {
+                    xml.push_str(" max=\"10000\"");
+                    if let Some(cursor) = cursor {
+                        write!(
+                            xml,
+                            " paginierungLetzteBestId=\"{}\"",
+                            quick_xml::escape::escape(cursor)
+                        )
+                        .unwrap();
+                    }
+                    xml.push_str(">\n");
+                    for name in self.anfrage_datenarten() {
+                        writeln!(xml, "<DatenartBereitstellung name=\"{name}\"/>").unwrap();
+                    }
+                    xml.push_str("</PostfachAnfrage>\n");
+                }
+                Operation::Bestaetigung => unreachable!("confirmation has its own request body"),
+            }
+        })
+    }
+}
+
+fn envelope(
+    operation: Operation,
+    hersteller_id: &str,
+    test: bool,
+    body: impl FnOnce(&mut String),
+) -> CString {
+    let datenart = operation.datenart();
+    let mut xml = String::with_capacity(1024);
+    write!(xml, r#"<?xml version="1.0" encoding="UTF-8"?>
 <Elster xmlns="http://www.elster.de/elsterxml/schema/v11">
 <TransferHeader version="11">
 <Verfahren>ElsterDatenabholung</Verfahren><DatenArt>{datenart}</DatenArt><Vorgang>send-Auth</Vorgang>
 "#).unwrap();
-        if test {
-            xml.push_str("<Testmerker>700000001</Testmerker>\n");
-        }
-        write!(xml, r#"<HerstellerID>{hersteller_id}</HerstellerID><DatenLieferant>KIECLI</DatenLieferant>
+    if test {
+        xml.push_str("<Testmerker>700000001</Testmerker>\n");
+    }
+    write!(xml, r#"<HerstellerID>{hersteller_id}</HerstellerID><DatenLieferant>KIECLI</DatenLieferant>
 <Datei><Verschluesselung>CMSEncryptedData</Verschluesselung><Kompression>GZIP</Kompression><TransportSchluessel/></Datei>
 </TransferHeader>
 <DatenTeil><Nutzdatenblock>
 <NutzdatenHeader version="11"><NutzdatenTicket>1</NutzdatenTicket><Empfaenger id="L">CS</Empfaenger>
 <Hersteller><ProduktName>KIECLI</ProduktName><ProduktVersion>{}</ProduktVersion></Hersteller></NutzdatenHeader>
 <Nutzdaten><Datenabholung xmlns="http://finkonsens.de/elster/elsterdatenabholung/v3" version="32">
-<{datenart} einschraenkung="{}" rolle="inhaber""#, env!("CARGO_PKG_VERSION"), self.einschraenkung.as_str()).unwrap();
-        for (name, date) in [("von", self.von), ("bis", self.bis)] {
-            if let Some(date) = date {
-                let (year, month, day) = date.to_calendar_date();
-                write!(xml, " {name}=\"{year:04}{:02}{day:02}\"", u8::from(month)).unwrap();
-            }
-        }
-        match operation {
-            // PostfachStatus has no Datenart filter on the wire.
-            Operation::Status => xml.push_str("/>\n"),
-            Operation::Anfrage => {
-                xml.push_str(" max=\"10000\"");
-                if let Some(cursor) = cursor {
-                    write!(
-                        xml,
-                        " paginierungLetzteBestId=\"{}\"",
-                        quick_xml::escape::escape(cursor)
-                    )
-                    .unwrap();
-                }
-                xml.push_str(">\n");
-                for name in self.anfrage_datenarten() {
-                    writeln!(xml, "<DatenartBereitstellung name=\"{name}\"/>").unwrap();
-                }
-                xml.push_str("</PostfachAnfrage>\n");
-            }
-        }
-        xml.push_str("</Datenabholung></Nutzdaten>\n</Nutzdatenblock></DatenTeil>\n</Elster>\n");
-        CString::new(xml).expect("NUL-free Postfach request")
-    }
+"#, env!("CARGO_PKG_VERSION")).unwrap();
+    body(&mut xml);
+    xml.push_str("</Datenabholung></Nutzdaten>\n</Nutzdatenblock></DatenTeil>\n</Elster>\n");
+    CString::new(xml).expect("NUL-free Postfach request")
 }
 
 #[derive(Deserialize)]
@@ -565,6 +644,7 @@ impl Operation {
         let error = match self {
             Self::Status => "postfach_status_invalid",
             Self::Anfrage => "postfach_anfrage_invalid",
+            Self::Bestaetigung => "postfach_bestaetigung_invalid",
         };
         Failure::new(
             1,
@@ -580,6 +660,7 @@ impl Operation {
                 .help(match self {
                     Self::Status => "Use --von or --bis to narrow the date range. --datenart only filters returned counts for PostfachStatus.",
                     Self::Anfrage => "Use --von, --bis or --datenart to narrow the Anfrage.",
+                    Self::Bestaetigung => "Check the Postfach-Nachricht IDs.",
                 }),
             190010802 => Failure::new(5, "datenart_not_released", "ELSTER has not released the Bereitstellungsdatenart"),
             601015001 if rejected_hersteller_id(rc) => {
@@ -654,6 +735,12 @@ enum Results {
     Anfrage {
         postfach_nachrichten: Vec<anfrage::Nachricht>,
     },
+    Abholung {
+        postfach_nachrichten: Vec<abholung::Collected>,
+    },
+    Bestaetigung {
+        postfach_nachrichten: Vec<bestaetigung::Confirmation>,
+    },
 }
 
 #[derive(Serialize)]
@@ -691,6 +778,39 @@ impl Output {
                     nachricht.write_text(&mut out)?;
                 }
             }
+            Results::Abholung {
+                postfach_nachrichten,
+            } => {
+                for nachricht in postfach_nachrichten {
+                    nachricht.write_text(&mut out)?;
+                }
+            }
+            Results::Bestaetigung {
+                postfach_nachrichten,
+            } => {
+                for nachricht in postfach_nachrichten {
+                    writeln!(
+                        out,
+                        "{}: {}",
+                        nachricht.id.escape_debug(),
+                        if nachricht.bestaetigt {
+                            "confirmed"
+                        } else {
+                            "not confirmed"
+                        }
+                    )?;
+                    if let Some(code) = &nachricht.rueckgabe {
+                        writeln!(
+                            out,
+                            "  ELSTER {}: {}",
+                            code.code,
+                            code.text.as_deref().unwrap_or_default().escape_debug()
+                        )?;
+                    } else if let Some(failure) = &nachricht.fehler {
+                        failure.write_text(&mut out)?;
+                    }
+                }
+            }
         }
         writeln!(
             out,
@@ -719,11 +839,12 @@ impl Output {
 }
 
 pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(), Failure> {
-    let (options, operation) = match command {
-        Command::Status(options) => (options, Operation::Status),
-        Command::Anfrage(options) => (options, Operation::Anfrage),
+    let scope = match command {
+        Command::Status(options) => Some(Scope::new(cli, options, Operation::Status)?),
+        Command::Anfrage(options) => Some(Scope::new(cli, options, Operation::Anfrage)?),
+        Command::Abholung(options) => Some(options.scope(cli)?),
+        Command::Bestaetigung(_) => None,
     };
-    let scope = Scope::new(cli, options, operation)?;
     let (mut settings, path, pin, hersteller_id) = config::request_settings(cli)?;
     let installed = eric::installed_dir(&settings.eric_dir)?;
     let dir = installed.as_deref().unwrap_or(&settings.eric_dir);
@@ -739,8 +860,10 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
                     OffsetDateTime::now_utc(),
                     trace,
                 )?;
-                match operation {
-                    Operation::Status => Ok(Results::Status {
+                match command {
+                    Command::Status(_) => {
+                        let scope = scope.as_ref().expect("status scope");
+                        Ok(Results::Status {
                         bereitstellungsdatenarten: scope.execute(
                             &eric,
                             &hersteller_id,
@@ -748,16 +871,44 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
                             trace,
                         )?,
                         einschraenkung: scope.einschraenkung,
-                    }),
-                    Operation::Anfrage => Ok(Results::Anfrage {
+                        })
+                    }
+                    Command::Anfrage(_) => Ok(Results::Anfrage {
                         postfach_nachrichten: anfrage::execute(
-                            &scope,
+                            scope.as_ref().expect("anfrage scope"),
                             &eric,
                             &hersteller_id,
                             settings.test,
                             trace,
                         )?,
                     }),
+                    Command::Abholung(options) => {
+                        let otto = session.otto(&path, &pin, &hersteller_id, trace)?;
+                        let postfach_nachrichten = abholung::execute(
+                            options,
+                            scope.as_ref().expect("abholung scope"),
+                            &eric,
+                            &otto,
+                            &hersteller_id,
+                            settings.test,
+                            trace,
+                        )?;
+                        if postfach_nachrichten.iter().any(abholung::Collected::pending) {
+                            settings.warnings.push(config::Warning::new(
+                                "bestaetigung_pending",
+                                "Confirm collected Postfach-Nachrichten within 24 hours of Abholung.",
+                            ));
+                        }
+                        Ok(Results::Abholung { postfach_nachrichten })
+                    }
+                    Command::Bestaetigung(options) => {
+                        let ids: Vec<_> = options.id.iter().map(String::as_str).collect();
+                        Ok(Results::Bestaetigung {
+                            postfach_nachrichten: bestaetigung::execute(
+                                &ids, &eric, &hersteller_id, settings.test, trace,
+                            ),
+                        })
+                    }
                 }
             })
         })
@@ -765,7 +916,21 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
             if failure.code() != TEST_CERTIFICATE_REQUIRES_TESTMERKER {
                 return failure;
             }
-            match options.correction(cli, operation, None, true) {
+            let suggestion = match command {
+                Command::Status(options) => options.correction(cli, Operation::Status, None, true),
+                Command::Anfrage(options) => options.correction(cli, Operation::Anfrage, None, true),
+                Command::Abholung(options) => options.correction(cli, None, true),
+                Command::Bestaetigung(options) => {
+                    let mut command = String::from("kiecli postfach bestaetigung");
+                    for id in &options.id {
+                        if append_arg(&mut command, "--id", id).is_none() {
+                            return failure;
+                        }
+                    }
+                    correction(cli, command, None, None, true)
+                }
+            };
+            match suggestion {
                 Some(command) => failure.suggestion(command),
                 None => failure,
             }
@@ -781,5 +946,32 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
         Format::Json => write_json(out, &output),
         Format::Text => output.write_text(&mut out),
     }
-    .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
+    .map_err(|err| Failure::new(1, "output_failed", err.to_string()))?;
+    match output.results {
+        Results::Abholung {
+            postfach_nachrichten,
+        } => abholung::outcome(postfach_nachrichten),
+        Results::Bestaetigung {
+            postfach_nachrichten,
+        } => confirmation_outcome(postfach_nachrichten),
+        _ => Ok(()),
+    }
+}
+
+fn confirmation_outcome(rows: Vec<bestaetigung::Confirmation>) -> Result<(), Failure> {
+    let successes = rows.iter().filter(|row| row.bestaetigt).count();
+    if successes == rows.len() {
+        return Ok(());
+    }
+    if successes > 0 {
+        return Err(Failure::new(
+            7,
+            "bestaetigung_partial",
+            "Some Postfach-Nachrichten were not confirmed",
+        ));
+    }
+    Err(rows
+        .into_iter()
+        .find_map(bestaetigung::Confirmation::into_failure)
+        .expect("at least one unconfirmed ID"))
 }

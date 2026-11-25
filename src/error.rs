@@ -10,7 +10,7 @@ pub(crate) struct Report<'a> {
     pub(crate) error: &'a Failure,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(crate) struct Failure {
     #[serde(skip)]
     pub(crate) exit: u8,
@@ -27,7 +27,7 @@ pub(crate) struct Failure {
     retry: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct Cause {
     source: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]

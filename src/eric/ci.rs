@@ -129,6 +129,15 @@ fn validates_placeholder_hersteller_id_offline() {
             process_request(session, &anfrage, c"PostfachAnfrage_32", None),
             (0, None)
         );
+
+        let bestaetigung = CString::new(include_str!(
+            "../../tests/fixtures/requests/postfach-bestaetigung.xml"
+        ))
+        .unwrap();
+        assert_eq!(
+            process_request(session, &bestaetigung, c"PostfachBestaetigung_32", None),
+            (0, None)
+        );
     });
 }
 

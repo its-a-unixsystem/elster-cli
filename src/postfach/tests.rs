@@ -20,6 +20,7 @@ fn scope(args: &[&str]) -> Scope {
     let (options, operation) = match command {
         Command::Status(options) => (options, Operation::Status),
         Command::Anfrage(options) => (options, Operation::Anfrage),
+        _ => panic!("expected status or anfrage"),
     };
     Scope::new(&cli, options, operation)
         .unwrap_or_else(|err| panic!("{}", serde_json::to_value(err).unwrap()))

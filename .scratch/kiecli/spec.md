@@ -126,7 +126,7 @@ Sources: [Agent interface](issues/09-agent-interface.md), [Kontoabfrage requests
 kiecli postfach status        [--datenart X…] [--neue|--alle] [--von D] [--bis D]
 kiecli postfach anfrage       [--datenart X…] [--neue|--alle] [--von D] [--bis D]
 kiecli postfach abholung      (--id ID… | --neue) --out DIR (--bestaetigen | --ohne-bestaetigung)
-                                  [--datenart X…] [--mit-meta]
+                                  [--datenart X…] [--von D] [--bis D] [--mit-meta]
 kiecli postfach bestaetigung  --id ID…
 kiecli kontoabfrage offene-betraege
 kiecli kontoabfrage zahlungen      --ab D [--ein-jahr] [--steuerart X…]
@@ -161,6 +161,7 @@ kiecli skill
 **`postfach abholung`:**
 
 1. Runs its own PostfachAnfrage to resolve object IDs, sizes and names, so the caller passes only ids or `--neue`.
+   The wire Anfrage cannot filter by ID: explicit IDs are selected from its `alle` results so confirmed Nachrichten remain retrievable. The date bounds narrow that search or the `--neue` search.
 2. Requires exactly one of `--bestaetigen` or `--ohne-bestaetigung`; with neither it is exit 2. Nothing is confirmed implicitly, and nothing is fetched until the caller has decided.
 3. `--out DIR` is mandatory; no content goes to stdout. Files are laid out as in §7.
 4. Fetches every object of each Postfach-Nachricht through Otto (`OttoDatenAbholen` with the Anfrage's `ReferenzId` and `Groesse`). Otto returns the plaintext object, already decrypted and decompressed, so it is written as is. The Anfrage's `Groesse` is the transport size, not the file size (1372 announced, 626 delivered on the test system). Otto has no Testmerker parameter: the Objektspeicher tells test from live by the Certificate, so the test system needs nothing extra.

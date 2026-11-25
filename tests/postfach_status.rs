@@ -107,6 +107,52 @@ fn refuses_conflicting_scope_flags_and_invalid_calendar_ranges() {
 }
 
 #[test]
+fn abholung_requires_an_explicit_confirmation_choice_and_safe_selection() {
+    let home = TempDir::new().unwrap();
+    for args in [
+        &["--neue", "--out", "unused"][..],
+        &[
+            "--neue",
+            "--out",
+            "unused",
+            "--bestaetigen",
+            "--ohne-bestaetigung",
+        ][..],
+        &[
+            "--neue",
+            "--id",
+            "be_example",
+            "--out",
+            "unused",
+            "--bestaetigen",
+        ][..],
+        &["--id", "../escape", "--out", "unused", "--bestaetigen"][..],
+        &["--neue", "--bestaetigen"][..],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_kiecli"))
+            .env_clear()
+            .env("HOME", home.path())
+            .args(["postfach", "abholung"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(error(output, 2)["code"], "usage_error");
+    }
+    assert_eq!(
+        error(
+            Command::new(env!("CARGO_BIN_EXE_kiecli"))
+                .env_clear()
+                .env("HOME", home.path())
+                .args(["postfach", "bestaetigung"])
+                .output()
+                .unwrap(),
+            2,
+        )["code"],
+        "usage_error"
+    );
+}
+
+#[test]
 #[ignore = "requires official ERiC 44 and a test Certificate; rejection must be local"]
 fn rejects_a_test_certificate_in_live_mode() {
     let home = TempDir::new().unwrap();
