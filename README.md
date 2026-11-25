@@ -38,6 +38,16 @@ cargo run -- eric status --eric-dir /path/to/Linux-x86_64
 
 An unusable installation exits with code 4. Stdout still contains the status checks that ran; stderr contains the error. JSON uses `null` for the version and its support status when the version could not be read.
 
+## Continuous integration
+
+CI checks formatting, Clippy, tests, dependency licences and advisories, and
+DCO sign-offs (`git commit --signoff`). The `eric-local` job installs verified
+ERiC on the runner and exercises it offline without a HerstellerID secret.
+The manual `elster-reachability` run uses only an official test Certificate
+and the placeholder HerstellerID `12345`. It sends one read-only PostfachStatus
+and expects ELSTER's `601015001` reply. ELSTER files remain on the ephemeral
+runner and are not uploaded to caches or artifacts.
+
 ## Licence
 
 `AGPL-3.0-only` ([LICENSE](LICENSE)), with an [additional permission](NOTICE) to combine the program with ERiC and Otto as published by ELSTER.

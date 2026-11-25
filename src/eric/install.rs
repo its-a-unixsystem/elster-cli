@@ -366,8 +366,11 @@ fn verify_download(
 fn extract_platform(file: File, prefix: &Path, dir: &Path) -> Result<(), Failure> {
     let mut archive = ZipArchive::new(BufReader::new(file)).map_err(archive_error)?;
     for index in 0..archive.len() {
-        let name = archive.name_for_index(index).expect("ZIP entry index");
-        let Ok(relative) = Path::new(name).strip_prefix(prefix) else {
+        let name = archive
+            .name_for_index(index)
+            .expect("ZIP entry index")
+            .map_err(archive_error)?;
+        let Ok(relative) = Path::new(name.as_ref()).strip_prefix(prefix) else {
             continue;
         };
         if relative.as_os_str().is_empty() {

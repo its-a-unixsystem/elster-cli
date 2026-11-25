@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: ${{ github.event_name != 'workflow_dispatch' && !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check DCO sign-offs
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="$PR_BASE"
+            head="$PR_HEAD"
+          else
+            base="$PUSH_BEFORE"
+            head="$GITHUB_SHA"
+            if [[ "$base" == 0000000000000000000000000000000000000000 ]]; then
+              base=''
+              if [[ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+                base=$(git rev-parse --verify "refs/remotes/origin/$DEFAULT_BRANCH^{commit}")
+              fi
+            fi
+          fi
+          if [[ -n "$base" ]] && ! git cat-file -e "$base^{commit}"; then
+            git fetch --no-tags origin "$base"
+          fi
+          bash .github/scripts/check-dco.sh "$head" "$base"
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
+        with:
+          arguments: --locked
+
+  eric-local:
+    if: ${{ github.event_name != 'workflow_dispatch' && !github.event.deleted }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-test-eric
+        id: eric
+      - name: Check the offline binding
+        env:
+          KIECLI_TEST_ERIC_HOME: ${{ steps.eric.outputs.home }}
+        run: |
+          cargo test --locked --test eric_status reports_the_loaded_library_version_offline -- --ignored --exact
+          cargo test --locked --bin kiecli eric::install::tests::extracts_only_linux_and_activates_after_a_real_test_load -- --ignored --exact
+          cargo test --locked --bin kiecli eric::ci::validates_placeholder_hersteller_id_offline -- --ignored --exact
+
+  # Remove this job once a hosted runner has received the expected ELSTER reply.
+  elster-reachability:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-test-eric
+        id: eric
+      - name: Send the read-only test-system probe
+        shell: bash
+        env:
+          KIECLI_TEST_ERIC_HOME: ${{ steps.eric.outputs.home }}
+        run: |
+          umask 077
+          tmp=$(mktemp -d)
+          trap 'rm -rf -- "$tmp"' EXIT
+          read -r url sha256 <<< "$(python3 -c 'import tomllib; c = tomllib.load(open("tests/downloads.toml", "rb"))["test_certificate"]; print(c["url"], c["sha256"])')"
+          curl --proto '=https' --fail --silent --show-error --max-time 60 --output "$tmp/certs.zip" -- "$url"
+          printf '%s  %s\n' "$sha256" "$tmp/certs.zip" | sha256sum --check
+          unzip -p "$tmp/certs.zip" test-softorg-pse.pfx > "$tmp/test-softorg-pse.pfx"
+          export KIECLI_TEST_CERTIFICATE="$tmp/test-softorg-pse.pfx"
+          KIECLI_TEST_POSTFACH_SINCE=$(date -u -d yesterday +%Y%m%d)
+          export KIECLI_TEST_POSTFACH_SINCE
+          cargo test --locked --bin kiecli eric::ci::elster_test_system_is_reachable -- --ignored --exact

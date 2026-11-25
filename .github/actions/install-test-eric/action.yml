@@ -1,0 +1,18 @@
+name: Install ERiC for CI
+description: Install the pinned official ERiC package using KIECLI
+outputs:
+  home:
+    description: Path to the unpacked official ERiC package
+    value: ${{ steps.install.outputs.home }}
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      run: |
+        read -r version sha256 <<< "$(python3 -c 'import tomllib; c = tomllib.load(open("tests/downloads.toml", "rb"))["eric"]; print(c["version"], c["sha256"])')"
+        # Keep ELSTER files on this ephemeral runner, not in shared caches or artifacts.
+        root="$RUNNER_TEMP/kiecli-test/$sha256"
+        cargo run --locked -- --eric-dir "$root" eric install --version "$version" --sha256 "$sha256" --accept-eric-terms
+        home=$(realpath -e -- "$root/.kiecli-eric-current")
+        printf 'home=%s\n' "$home" >> "$GITHUB_OUTPUT"
