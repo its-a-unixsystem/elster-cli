@@ -62,3 +62,5 @@ kiecli kontoabfrage sollstellungen --steuerart X… --jahr YYYY…
 For `230077012`, `notes` explain that the Kontoabfrage presupposes an authorisation (Vollmacht or Freischaltung in Mein ELSTER). `describe` lists the Steuerart values and these codes.
 
 Checks added to [Test-system spike: ERiC end to end](11-test-system-spike.md). Amends [Agent interface](09-agent-interface.md) (the `kontoabfrage` placeholder) and [Configuration and secrets](10-config-and-secrets.md) (the Taxpayer-identifier row).
+
+Amended by [Test-system spike: ERiC end to end](11-test-system-spike.md): the test system never returns a Kontoabfrage result (test Organisationszertifikat: `230077012` for every Steuernummer; personal test certificates: `130025001`), so the `biene`/`alt` mapping is checked only in the live check. `230077012`/`950017011` get a `help` on activating the Steuerkontoabfrage in Mein ELSTER, which varies by Bundesland.

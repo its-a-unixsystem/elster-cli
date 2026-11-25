@@ -186,7 +186,7 @@ kiecli skill
    - A Bescheid-format number without `bundesland` is exit 2, with a `help` naming the flag.
    - The Empfänger (Bundesfinanzamtsnummer, the first four digits) is always derived from the Steuernummer, never a setting.
 6. `--mit-xml` adds the raw `kontoabfrage` Nutzdaten as one string (§6.3).
-7. ⏳ Which test Steuernummern the test system accepts (examples use Finanzamt 9238), which response shape the test Finanzamt returns, and whether the test Organisationszertifikat gets a result or `230077012`.
+7. On the test system no public test certificate gets a result: the test Organisationszertifikat gets `230077012` for every Steuernummer (the authorisation check comes before the Steuernummer check), and the personal test certificates are not admitted to the Kontoabfrage (`130025001`). Request format, Testmerker, Empfänger and transport are verified there; the response shapes (`biene`, `alt`) only in the live check (§12.5).
 
 ### 5.3 `zertifikat status`
 
@@ -350,14 +350,25 @@ All have `retry: false`. KIECLI never switches to test mode silently; a real Cer
 | `950017009`, `950017010`, `950019999` | 5, `help`: contact the Finanzamt |
 | `950019011`, `950017008` | 6, `retry: true` |
 
-For `230077012`, `notes` explain that the Kontoabfrage presupposes an authorisation (Vollmacht or Freischaltung in Mein ELSTER) ⏳ (how a real account clears `230077012`/`950017011`).
+For `230077012` and `950017011`, `help` says the Steuerkontoabfrage must be activated for this Steuernummer in Mein ELSTER (for a Vollmachtgeber's number, with the Steuerkontoabfrage hint set to active), and that the first activation differs by Bundesland, so the Finanzamt can tell how. ELSTER's own documents only say a Vollmacht is presupposed; the rest comes from Land information sheets and the ELSTER forum (sources in the spike ticket).
 
 ### 8.3 Other mappings
 
 - Missing settings, PIN channel failures and unreadable config: exit 3 (§4).
 - A missing ERiC, an unsupported version, terms not accepted, or a missing `libgcc_s.so.1`: exit 4 (§3).
-- **ELSTER rejections arrive as ERiC `610101210`** ("Fehler im Transferheader"), with ELSTER's own code in the server answer's TransferHeader `RC` (`Rueckgabe`, and the specific code in `Stack` when the Nutzdaten fail). The mapping keys on the `RC` code, which goes into `cause` with its text. Seen so far: `190017608` (more than 500,000 entries, exit 5), `190010802` (Bereitstellungsdatenart not released, exit 5), `601015001` (Testmerker not admitted for ERiC, exit 5).
-- ⏳ The ERiC and Otto codes for a missing or blocked HerstellerID (610301202 locally for `74931`), a wrong PIN on the wire, and an OTTER 503, and the remaining ERiC/ELSTER codes of the Postfach procedures, mapped to 5 or 6.
+- **ELSTER rejections arrive as ERiC `610101210`** ("Fehler im Transferheader"), with ELSTER's own code in the server answer's TransferHeader `RC` (`Rueckgabe`, and the specific code in `Stack` when the Nutzdaten fail). The mapping keys on the `RC` code, which goes into `cause` with its text. Seen so far: `190017608` (more than 500,000 entries, exit 5), `190010802` (Bereitstellungsdatenart not released, exit 5), `601015001` (Verfahrensprüfung failed; with "HerstellerID ist nicht zugelassen" it is exit 3, see below, otherwise exit 5, e.g. a Testmerker not admitted for ERiC). Because ELSTER reuses `601015001`, this one code is told apart by its text.
+- **HerstellerID and credentials** (exit 3, `retry: false`):
+
+  | Code | Source | Error code |
+  |---|---|---|
+  | `610301202` (HerstellerID blocked, e.g. `74931`) | ERiC, local | `hersteller_id_blocked` |
+  | `601015001` with "HerstellerID ist nicht zugelassen" | ELSTER TransferHeader | `hersteller_id_rejected` |
+  | `130025002` (TestCA without Testmerker) | ELSTER TransferHeader | `test_certificate_requires_testmerker` (normally caught locally, §8.1) |
+  | `130025001` (signature not admitted for the procedure, e.g. a personal Certificate for the Kontoabfrage) | ELSTER TransferHeader | `certificate_not_admitted` |
+  | `610405831` (wrong PIN in Otto) | Otto, local | `pin_wrong` |
+
+- **Otto** (`cause` carries Otto's code and text): `610403008` (object not found on the OTTER server) and `610405001` (invalid parameter, a malformed object id) are exit 5. `objektGroesse` is not checked by Otto, so a wrong size is no error.
+- Otto transport failures by name from `otto_statuscode.h`: `OTTO_TRANSFER_CONNECTSERVER` (610403003), `OTTO_TRANSFER_TIMEOUT` (610403005) and `OTTO_TRANSFER_SERVER_FEHLER` (610403009) are exit 6 with `retry: true`; `OTTO_TRANSFER_UNAUTHORIZED` (610403007) is exit 3. ⏳ That an OTTER 503 surfaces as `OTTO_TRANSFER_SERVER_FEHLER` is the header's reading only; it could not be provoked on the test system.
 - **Error-code names:** codes the tickets name are used as written: `datenart_unknown`, the certificate codes in §8.1, and `test_certificate_requires_testmerker`. Codes for the other conditions in §3–§5 are named in the build, in the same style (snake_case, glossary terms in German, otherwise English), and are all listed in `describe`.
 
 ## 9. Diagnostics
@@ -383,7 +394,7 @@ Embedded in the binary, printed by `kiecli skill`, with the same file in the rep
    - on 7, confirm only what was written;
    - retry a `teilweise` Abholung for that id, then confirm; if retries keep failing, confirm before the deadline anyway.
 6. Tolerate unknown warning and error codes and enum values.
-7. The Kontoabfrage, including what `230077012` means ⏳.
+7. The Kontoabfrage, including what `230077012` means and how a real account clears it (§8.2).
 8. `describe` for reference.
 
 ## 12. Testing
@@ -434,7 +445,7 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
 
   Never `pull_request_target`, never PR code checked out with the secret.
 - **Test-system runs** (Testmerker on every request):
-  - Always: `zertifikat status`, `postfach status`, `postfach anfrage`, all three `kontoabfrage` kinds, and the live-call refusal.
+  - Always: `zertifikat status`, `postfach status`, `postfach anfrage`, all three `kontoabfrage` kinds, and the live-call refusal. The `kontoabfrage` runs use the test Organisationszertifikat and expect exit 5 with `230077012`, the only answer the test system gives; they prove request format and transport, not the response mapping.
   - The test Postfach is shared by every Hersteller using the test Organisationszertifikat (over 800,000 entries, about 300 new a day), so every Postfach call passes `--von` (yesterday).
   - `postfach abholung --bestaetigen` and `postfach bestaetigung` run on one Nachricht that is already confirmed: listed in `alle` but not in `--neue`. Other Hersteller drain the test Postfach within hours, so there is always one. Fetching and confirming it again changes nothing for anyone else, while confirming a new one would hide it from another Hersteller's `--neue`. Whether a test-system Abholung counts toward our 24 h obligation is moot, because the run always confirms. Never `--ohne-bestaetigung` without a Bestätigung in the same run.
   - ⏳ If GitHub's runners cannot reach the test system, the same command runs on the maintainer's machine before each release, and the CI triggers are dropped.
@@ -443,7 +454,7 @@ Source: [Testing strategy](issues/15-testing-strategy.md), amended by [Distribut
 ### 12.5 Final live check
 
 1. The maintainer runs it with their own Certificate, before 1.0.0 and before any release that changes the ERiC major or the request XML.
-2. It follows a checked-in `docs/live-check.md`: commands and the expected shape of each result, no values. It includes one real `postfach abholung --bestaetigen` of an already-known Nachricht, with `--out` outside the repo.
+2. It follows a checked-in `docs/live-check.md`: commands and the expected shape of each result, no values. It includes one real `postfach abholung --bestaetigen` of an already-known Nachricht, with `--out` outside the repo, preferably one with an Anhang, and all three `kontoabfrage` kinds. These are the only checks of the Anhang path and of the `biene`/`alt` response mapping, because the test system delivers neither.
 3. The only record is a ticked checklist in the release PR: CLI and ERiC versions, and pass or fail per step.
 
 ## 13. Build, release and distribution
@@ -497,10 +508,7 @@ Each item names where its answer lands in this spec.
 
 | Question | Lands in |
 |---|---|
-| ERiC/Otto/ELSTER codes for a missing HerstellerID, a wrong PIN, an OTTER 503 and other Postfach failures | §8.3 |
-| An `O` Kontoabfrage on the test system: accepted test Steuernummern, the response shape, `230077012` for the test Organisationszertifikat | §5.2, §6.3 |
-| How a real account clears `230077012`/`950017011` | §8.2, §11 |
-| That a test certificate sent live is rejected | §8.1 |
+| That an OTTER 503 surfaces as `OTTO_TRANSFER_SERVER_FEHLER` | §8.3 |
 | Whether GitHub runners reach the test system | §12.4 |
 
 ## 16. Sources

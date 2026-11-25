@@ -86,3 +86,44 @@ One Nachricht only: the one `OVMVRM` listed under `einschraenkung="neue"` since 
   - a valid and an unknown id in one block: ERiC `610101292`, NutzdatenHeader `190017112` ("Der Empfang von mindestens einer der Daten wurde nicht erfolgreich bestätigt."), per id `0` for the valid one (confirmed) and `190015302` for the unknown one. Per-id results must be read even when ERiC reports an error.
 - **Safe pattern for recurring test-system runs:** take a Nachricht that is in `alle` but not in `neue` (already confirmed by someone), fetch it and confirm it. Nobody else sees a change. Confirming a `neue` one hides it from other Hersteller's `neue`. The question whether a test-system Abholung counts toward our 24 h obligation goes away if every run confirms what it fetched.
 - Still open from this ticket: a DIVA Nachricht with `Anhang` (none for the test Organisationszertifikat in 30 days; the personal test certificates are untried); OTTER 503 and Otto error codes; missing HerstellerID and wrong PIN on the wire; the Kontoabfrage; a test certificate sent live; GitHub runner reachability.
+
+### Step 4: Kontoabfrage, error codes, Otto details (2026-11-25)
+
+**Kontoabfrage.** An `O` request (`ElsterKontoabfrage_6`, Verfahren `ElsterKontoabfrage`, DatenArt `Kontoabfrage`, Testmerker `230000001`, NutzdatenHeader `Empfaenger id="F"` = the first four digits of the Steuernummer) goes through ERiC and reaches the server. No public test certificate ever gets a result:
+
+| Certificate | Steuernummern tried | Answer |
+|---|---|---|
+| `test-softorg-pse.pfx` | the two SSb examples (Finanzamt 9199 and 2657), a 9198 number, and the four `ag-steuernummer` values seen in its own Postfach | ERiC `610101292`, NutzdatenHeader `230077012` "Die für die Abfrage erforderliche Berechtigung liegt nicht vor.", `kontoabfrage-input` echoed without `steuernummer`, no output |
+| `test-soft-pse.pfx`, `test-softidnr-pse.pfx` | the same three | ERiC `610101210`, TransferHeader `130025001` "Die verwendete Signatur ist fuer das von Ihnen gewuenschte Verfahren und Datenart nicht zugelassen. Verfahren: ElsterKontoabfrage, Datenart: Kontoabfrage" |
+
+So the test system confirms the request format, the Testmerker, the Empfänger rule and the transport, but **never shows a response shape**. `biene` vs `alt` and the field mapping can only be checked in the live check. The authorisation check comes before any check of the Steuernummer: a number from a nonexistent test Finanzamt gets the same `230077012`.
+
+**Clearing `230077012` / `950017011` on a real account.** The Fehlerliste (2.1.1) only says `230077012` was added for the BIENE migration phase and `950017011` means "Speicherkonto für ELSTERKontoabfrage nicht freigegeben"; the SSb says a Vollmacht is presupposed. Public sources (ELSTER user forum, Land information sheets; not specifications) say the Steuerkontoabfrage must be activated for the Steuernummer in Mein ELSTER; the first activation has worked differently per Bundesland since late 2022; a Vollmachtgeber's Steuernummer needs the Steuerkontoabfrage hint set to active. The guidance for `SKILL.md` is therefore: activate the Steuerkontoabfrage for this Steuernummer in Mein ELSTER, or ask the Finanzamt how, since it varies by Land. Sources: [forum thread on 230077012](https://forum.elster.de/anwenderforum/forum/elster-webanwendungen/mein-elster/464096-steuerkontoabfrage-für-verein-elsterreturncode-230077012), [Steuerkontoabfrage freischalten](https://forum.elster.de/anwenderforum/forum/elster-webanwendungen/mein-elster/430167-steuerkontoabfrage-freischalten), [Merkblatt Sachsen](https://www.steuern.sachsen.de/download/Merkblatt_ELSTER_Steuerkontoabfrage.pdf), [Merkblatt Bremen](https://www.finanzen.bremen.de/sixcms/media.php/13/Merkblatt%2Bzur%2BSteuerkontoabfrage.pdf).
+
+**Error codes** (PostfachStatus with `von` = today unless noted):
+
+| Case | Where it fails | Code |
+|---|---|---|
+| Wrong PIN in `EricBearbeiteVorgang` | locally, while signing | ERiC `610201106` (same as `EricHoleZertifikatEigenschaften`) |
+| HerstellerID `74931` | locally | ERiC `610301202` "Die im XML angegebene Hersteller-ID ist gesperrt …" |
+| HerstellerID empty | locally, XML validation | ERiC `610301200` (details only in `eric.log`) |
+| Someone else's five-digit HerstellerID (`12345`) | server | ERiC `610101210`, TransferHeader `601015001` "HerstellerID ist nicht zugelassen." |
+| Testmerker `700000004` | server | ERiC `610101210`, `601015001` "Kombination … Eingang: eric … nicht zugelassen" |
+| Test certificate without Testmerker (live) | server | ERiC `610101210`, TransferHeader `130025002` "Die Verwendung einer TestCA ohne gesetzten Testmerker ist nicht zulaessig" |
+| Personal certificate for the Kontoabfrage | server | `130025001` (above) |
+
+So `test_certificate_requires_testmerker` guards a real server failure, and checking it locally saves a round trip with a confusing text.
+
+**Otto details:**
+- Unknown but well-formed `objektId` (random UUID): `610403008` "Der OTTER-Server hat das Objekt nicht gefunden."
+- Malformed `objektId`: `610405001` "Einer der übergebenen Parameter ist ungültig." (raised in `OttoEmpfangBeginnen`, before the network).
+- Wrong PIN: `610405831` "eSigner: Die PIN bzw. das Passwort ist falsch." Otto has its own PIN code, distinct from ERiC's `610201106`.
+- `objektGroesse` is not checked: a value of 10 still delivered all 626 bytes.
+- Someone else's HerstellerID (`12345`) was **accepted** by Otto on the test system. The Objektspeicher does not check it there.
+- Otto talks to `https://objektspeicher.elster.de:443/api/v1/obj/…` for test certificates as well; there is no separate test host. The Objektspeicher tells test from live by the certificate.
+- An OTTER 503 could not be provoked. `otto_statuscode.h` suggests `OTTO_TRANSFER_SERVER_FEHLER` (610403009); `OTTO_TRANSFER_CONNECTSERVER` (610403003) and `OTTO_TRANSFER_TIMEOUT` (610403005) are the other transient candidates, `OTTO_TRANSFER_UNAUTHORIZED` (610403007) a credentials one.
+- The re-fetched Nachricht was confirmed again afterwards; nothing is left unconfirmed under our HerstellerID.
+
+**Anhang:** no test Postfach (Organisation, Person/Steuernummer, Person/IdNr) holds a DIVA Nachricht, `EPBescheid`, `Gewerbesteuerbescheid`, `ESB`/`USB`/`GSB` or `GEWMB` in the last 90 days, and `AnhangRueckmeldung` has a Datenpaket, not an `Anhang`. The Anhang path (several objects per Nachricht, file names, PDF bytes) can only be checked in the live check. PostfachStatus undercounts here too.
+
+**Left for later:** GitHub runner reachability needs a workflow, so it waits for the first CI setup; a throwaway job with the placeholder HerstellerID `12345` would prove reachability without the secret (`601015001` means the server answered).
