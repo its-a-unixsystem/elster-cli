@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- Kontoabfrage reports ELSTER's authorization denial even when the reply has an empty header stack code and echoes the query without returning account data.
+
 - Kontoabfrage lets ERiC derive the four-digit Finanzamt number from full Bavarian and Berlin Bescheid-format Steuernummern instead of passing a three-digit prefix.
 
 - Kontoabfrage now reports retryable ELSTER backend results as exit 6 and preserves the ELSTER code even when there is no result text.

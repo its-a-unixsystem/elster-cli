@@ -92,6 +92,29 @@ fn maps_header_only_authorization_rejection() {
 }
 
 #[test]
+fn maps_authorization_rejection_with_an_empty_stack_code_and_echoed_input() {
+    let xml = r#"
+        <Elster>
+            <TransferHeader><RC><Rueckgabe><Code>0</Code></Rueckgabe><Stack><Code/></Stack></RC></TransferHeader>
+            <DatenTeil><Nutzdatenblock>
+                <NutzdatenHeader><RC><Rueckgabe><Code>230077012</Code></Rueckgabe></RC></NutzdatenHeader>
+                <Nutzdaten><kontoabfrage version="6"><kontoabfrage-teil>
+                    <kontoabfrage-input><kontoabfrage-art>O</kontoabfrage-art><steuernummer>redacted</steuernummer></kontoabfrage-input>
+                    <bearbeitungshinweis><return-code>230077012</return-code></bearbeitungshinweis>
+                </kontoabfrage-teil></kontoabfrage></Nutzdaten>
+            </Nutzdatenblock></DatenTeil>
+        </Elster>"#;
+    let Err(failure) = read(610101292, xml, None, "9199026211407", &one_open(), false) else {
+        panic!("an authorization rejection must not produce a Kontoabfrage result");
+    };
+    assert_eq!(failure.exit, 5);
+    let json = serde_json::to_value(failure).unwrap();
+    assert_eq!(json["code"], "kontoabfrage_authorization_required");
+    assert_eq!(json["cause"][0]["code"], 230077012);
+    assert_eq!(json["cause"][1]["code"], 610101292);
+}
+
+#[test]
 fn retries_backend_failures_and_keeps_codes_without_result_text() {
     for code in [950017008, 950019011] {
         let xml = format!(

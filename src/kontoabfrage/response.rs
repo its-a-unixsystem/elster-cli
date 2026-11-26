@@ -379,10 +379,21 @@ struct ReturnCodes {
 
 #[derive(Deserialize, Clone)]
 struct ReturnCode {
-    #[serde(rename = "Code")]
-    code: i32,
+    #[serde(rename = "Code", deserialize_with = "optional_return_code")]
+    code: Option<i32>,
     #[serde(rename = "Text")]
     text: Option<String>,
+}
+
+fn optional_return_code<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let code = String::deserialize(deserializer)?;
+    match code.trim() {
+        "" => Ok(None),
+        code => code.parse().map(Some).map_err(serde::de::Error::custom),
+    }
 }
 
 pub(super) fn read(
@@ -418,16 +429,21 @@ pub(super) fn read(
             }
         }
     }
-    if wire_parts.is_empty() {
-        if let Some((server_code, server_text)) =
+    // A full rejection can still echo inputs without returning any account data.
+    if wire_parts
+        .iter()
+        .all(|part| part.alt.is_none() && part.biene.is_none())
+        && let Some((server_code, server_text)) =
             all_codes.iter().find(|(server_code, _)| *server_code != 0)
-        {
-            let mut failure = mapped_failure(*server_code, server_text.clone());
-            if code != 0 {
-                failure = failure.eric_cause(code, text).note(eric::LOG_NOTE);
-            }
-            return Err(failure);
+        && (wire_parts.is_empty() || super::result_exit(*server_code) != 7)
+    {
+        let mut failure = mapped_failure(*server_code, server_text.clone());
+        if code != 0 {
+            failure = failure.eric_cause(code, text).note(eric::LOG_NOTE);
         }
+        return Err(failure);
+    }
+    if wire_parts.is_empty() {
         return Err(if code != 0 {
             transport_failure(code, text)
         } else {
@@ -773,13 +789,11 @@ fn normalize_datetime(raw: &str) -> String {
 
 fn collect_codes(header: &Header, codes: &mut Vec<(i32, Option<String>)>) {
     if let Some(rc) = &header.rc {
-        if let Some(result) = &rc.result {
-            codes.push((result.code, result.text.clone()));
-        }
         codes.extend(
-            rc.stack
+            rc.result
                 .iter()
-                .map(|result| (result.code, result.text.clone())),
+                .chain(&rc.stack)
+                .filter_map(|result| Some((result.code?, result.text.clone()))),
         );
     }
 }
