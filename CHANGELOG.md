@@ -19,6 +19,7 @@
 ### Fixed
 
 - Kontoabfrage now reports retryable ELSTER backend results as exit 6 and preserves the ELSTER code even when there is no result text.
+- Fixed Kontoabfrage warnings that blocked the strict CI lint check without changing requests or output.
 
 ### Security
 

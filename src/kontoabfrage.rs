@@ -34,7 +34,7 @@ pub(crate) enum Command {
 }
 
 #[derive(Args)]
-struct PaymentOptions {
+pub(crate) struct PaymentOptions {
     /// Include payments posted on or after this date (YYYY-MM-DD).
     #[arg(long, value_name = "DATE", value_parser = parse_date)]
     ab: Date,
@@ -47,7 +47,7 @@ struct PaymentOptions {
 }
 
 #[derive(Args)]
-struct AssessmentOptions {
+pub(crate) struct AssessmentOptions {
     /// Tax type (repeatable, case-insensitive).
     #[arg(long = "steuerart", required = true, value_name = "TYPE")]
     steuerarten: Vec<String>,
@@ -187,10 +187,12 @@ fn resolve_steuernummer(
 }
 
 fn request(inputs: &[Input], steuernummer: &str, bufa: &str, hersteller_id: &str, test: bool) -> CString {
-    let mut xml = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+    let mut xml = String::from(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <Elster xmlns="http://www.elster.de/elsterxml/schema/v11">
 <TransferHeader version="11"><Verfahren>ElsterKontoabfrage</Verfahren><DatenArt>Kontoabfrage</DatenArt><Vorgang>send-Auth</Vorgang>
-"#);
+"#,
+    );
     if test { xml.push_str("<Testmerker>230000001</Testmerker>\n"); }
     xml.push_str(&format!(r#"<HerstellerID>{hersteller_id}</HerstellerID><DatenLieferant>KIECLI</DatenLieferant>
 <Datei><Verschluesselung>CMSEncryptedData</Verschluesselung><Kompression>GZIP</Kompression><TransportSchluessel/></Datei>
@@ -264,7 +266,10 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
             let properties = authenticated.inspect(trace, |xml| Ok(xml.to_owned()))?;
             if certificate::check_for_request(&properties, time::OffsetDateTime::now_utc(), &mut settings.warnings)? && !settings.test { return Err(test_certificate_error()); }
             let xml = request(&requested, &normalized, &bufa, &hersteller_id, settings.test);
-            authenticated.send(&xml, c"ElsterKontoabfrage_6", trace, |code, reply, text| response::read(code, &reply, text, &normalized, &requested, cli.mit_xml))
+            authenticated
+                .send(&xml, c"ElsterKontoabfrage_6", trace, |code, reply, text| {
+                    response::read(code, reply, text, &normalized, &requested, cli.mit_xml)
+                })
                 .map(|payload| (normalized, bufa, payload))
         })
     })?;

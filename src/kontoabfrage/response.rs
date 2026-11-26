@@ -17,7 +17,7 @@ mod tests;
 
 #[derive(Serialize, JsonSchema)]
 pub(super) struct Reply {
-    pub(super) teile: Vec<Teil>,
+    teile: Vec<Teil>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(required)]
     pub(super) xml: Option<String>,
@@ -437,10 +437,11 @@ pub(super) fn read(
             break;
         }
     }
-    if outcome.is_ok() {
-        if let Some((server_code, server_text)) = all_codes.iter().find(|(server_code, _)| *server_code != 0) {
-            outcome = Err(mapped_failure(*server_code, server_text.clone()));
-        }
+    if outcome.is_ok()
+        && let Some((server_code, server_text)) =
+            all_codes.iter().find(|(server_code, _)| *server_code != 0)
+    {
+        outcome = Err(mapped_failure(*server_code, server_text.clone()));
     }
     if let Err(mut failure) = outcome {
         for (server_code, server_text) in &all_codes { if *server_code != 0 { failure = failure.cause("elster", Some(*server_code), server_text.clone()); } }
