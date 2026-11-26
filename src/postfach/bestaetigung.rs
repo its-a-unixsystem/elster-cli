@@ -248,6 +248,12 @@ mod tests {
         let eric = FakeEric::default();
         eric.responses.borrow_mut().push_back((610101292, &reply));
         let result = execute(&[FIRST, SECOND], &eric, "12345", true, &mut None);
+        super::super::validate_output(
+            "postfach bestaetigung",
+            super::super::Messages {
+                postfach_nachrichten: result.iter().collect(),
+            },
+        );
         let golden = include_str!("../../tests/fixtures/requests/postfach-bestaetigung.xml")
             .replace(
                 "<ProduktVersion>0.1.0",
@@ -286,6 +292,12 @@ mod tests {
             .borrow_mut()
             .extend([(610101200, ""), (0, &reply)]);
         let result = execute(&ids, &eric, "12345", false, &mut None);
+        super::super::validate_output(
+            "postfach bestaetigung",
+            super::super::Messages {
+                postfach_nachrichten: result.iter().collect(),
+            },
+        );
         let requests = eric.requests.borrow();
         assert_eq!(requests.len(), 2);
         assert_eq!(requests[0].matches("<Bereitstellung id=").count(), 100);
@@ -302,5 +314,8 @@ mod tests {
         }
         assert!(result[100].bestaetigt);
         assert!(result[100].fehler.is_none());
+        let failure = super::super::confirmation_outcome(result).err().unwrap();
+        assert_eq!(failure.code(), "bestaetigung_partial");
+        crate::describe::contract::stderr(&failure);
     }
 }

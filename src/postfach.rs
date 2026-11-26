@@ -772,6 +772,20 @@ pub(crate) fn stdout_schema(command: &str, generator: SchemaGenerator) -> Option
     })
 }
 
+#[cfg(test)]
+fn validate_output(command: &str, results: impl Serialize) -> serde_json::Value {
+    crate::describe::contract::stdout(
+        command,
+        &Output {
+            results,
+            test: true,
+            profile: None,
+            warnings: Vec::new(),
+            trace: None,
+        },
+    )
+}
+
 impl Output<Results> {
     fn write_text(&self, mut out: impl Write) -> std::io::Result<()> {
         match &self.results {

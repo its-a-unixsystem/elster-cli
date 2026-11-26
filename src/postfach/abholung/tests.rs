@@ -142,7 +142,18 @@ fn run_id(fake: &Fake<'_>, id: &str, confirmation: &str) -> Vec<Collected> {
         panic!("expected abholung");
     };
     let scope = options.scope(&cli).unwrap_or_else(fail);
-    execute(options, &scope, fake, fake, "12345", true, &mut None).unwrap_or_else(fail)
+    let rows = execute(options, &scope, fake, fake, "12345", true, &mut None).unwrap_or_else(fail);
+    super::super::validate_output(
+        "postfach abholung",
+        super::super::Messages {
+            postfach_nachrichten: rows.iter().collect(),
+        },
+    );
+    rows
+}
+
+fn checked_outcome(rows: Vec<Collected>) -> Result<(), Failure> {
+    outcome(rows).inspect_err(crate::describe::contract::stderr)
 }
 
 fn fail<T>(failure: Failure) -> T {
@@ -175,7 +186,7 @@ fn abholung_stores_plaintext_and_confirms_after_both_files_exist() {
         entry["files"][1]["sha256"],
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
-    outcome(rows).unwrap_or_else(fail);
+    checked_outcome(rows).unwrap_or_else(fail);
 }
 
 #[test]
@@ -203,7 +214,7 @@ fn abholung_keeps_previous_file_and_deadline_after_partial_transfer() {
     );
     assert_eq!(fs::read(attachment).unwrap(), b"previous bytes");
     assert_eq!(fs::read_dir(attachments).unwrap().count(), 1);
-    assert_eq!(outcome(rows).err().unwrap().exit, 7);
+    assert_eq!(checked_outcome(rows).err().unwrap().exit, 7);
 }
 
 #[test]
@@ -221,7 +232,10 @@ fn abholung_does_not_follow_symlinks_at_message_path() {
     let json = serde_json::to_value(&rows).unwrap();
     assert_eq!(json[0]["status"], "fehlgeschlagen");
     assert_eq!(json[0]["bestaetigung_faellig_bis"], Value::Null);
-    assert_eq!(outcome(rows).err().unwrap().code(), "postfach_write_failed");
+    assert_eq!(
+        checked_outcome(rows).err().unwrap().code(),
+        "postfach_write_failed"
+    );
     assert!(fs::read_dir(other.path()).unwrap().next().is_none());
 }
 
@@ -240,7 +254,7 @@ fn abholung_can_defer_confirmation_of_completed_files() {
     assert_eq!(json[0]["bestaetigt"], false);
     assert!(json[0]["bestaetigung_faellig_bis"].is_string());
     assert!(!fake.confirmed.get());
-    outcome(rows).unwrap_or_else(fail);
+    checked_outcome(rows).unwrap_or_else(fail);
 }
 
 #[test]
@@ -259,7 +273,7 @@ fn abholung_reports_a_nachricht_without_files_as_not_collected() {
     assert_eq!(json[0]["bestaetigung_faellig_bis"], Value::Null);
     assert!(!fake.confirmed.get());
     assert_eq!(
-        outcome(rows).err().unwrap().code(),
+        checked_outcome(rows).err().unwrap().code(),
         "postfach_nachricht_no_objects"
     );
 }
@@ -279,7 +293,10 @@ fn abholung_refuses_a_message_directory_writable_by_others() {
         fail_attachment: false,
     };
     let rows = run(&fake, "--bestaetigen");
-    assert_eq!(outcome(rows).err().unwrap().code(), "postfach_write_failed");
+    assert_eq!(
+        checked_outcome(rows).err().unwrap().code(),
+        "postfach_write_failed"
+    );
     assert!(!fake.confirmed.get());
     assert!(fs::read_dir(message).unwrap().next().is_none());
 }

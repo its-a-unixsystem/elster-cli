@@ -4,6 +4,22 @@
 use super::*;
 use time::macros::date;
 
+fn validate_output(command: &str, art: &'static str, reply: Reply) -> serde_json::Value {
+    crate::describe::contract::stdout(
+        command,
+        &super::super::Output {
+            steuernummer: "9199026211407".to_owned(),
+            bundesfinanzamtsnummer: "9199".to_owned(),
+            abfrageart: art,
+            teile: reply,
+            test: true,
+            profile: None,
+            warnings: Vec::new(),
+            trace: None,
+        },
+    )
+}
+
 fn one_open() -> Vec<Input> { vec![Input::Open] }
 
 #[test]
@@ -13,7 +29,7 @@ fn maps_a_legacy_response_and_normalizes_amounts() {
         Ok(reply) => reply,
         Err(err) => panic!("unexpected response error: {}", serde_json::to_value(err).unwrap()),
     };
-    let value = serde_json::to_value(reply).unwrap();
+    let value = validate_output("kontoabfrage offene-betraege", "O", reply);
     assert_eq!(value["teile"][0]["antwort_format"], "alt");
     assert_eq!(value["teile"][0]["steuerarten"][0]["teilbetraege"][0]["wert"], "-2061.00");
     assert!(value["xml"].as_str().unwrap().starts_with("<kontoabfrage"));
@@ -30,7 +46,7 @@ fn matches_reordered_payment_answers_by_echoed_input() {
         Ok(reply) => reply,
         Err(err) => panic!("unexpected response error: {}", serde_json::to_value(err).unwrap()),
     };
-    let value = serde_json::to_value(reply).unwrap();
+    let value = validate_output("kontoabfrage zahlungen", "I", reply);
     assert_eq!(value["teile"][0]["steuerart"], "USt");
     assert_eq!(value["teile"][1]["steuerart"], "ESt");
     assert_eq!(value["teile"][1]["zeilen"][0]["zufluss"], "1234.50");
@@ -43,6 +59,7 @@ fn maps_header_only_authorization_rejection() {
         Ok(_) => panic!("expected an authorization failure"),
         Err(failure) => failure,
     };
+    crate::describe::contract::stderr(&failure);
     let json = serde_json::to_value(failure).unwrap();
     assert_eq!(json["code"], "kontoabfrage_authorization_required");
     assert_eq!(json["cause"][0]["code"], 230077012);
@@ -59,6 +76,7 @@ fn retries_backend_failures_and_keeps_codes_without_result_text() {
             Err(failure) => failure,
         };
         assert_eq!(failure.exit, 6);
+        crate::describe::contract::stderr(&failure);
         let json = serde_json::to_value(failure).unwrap();
         assert_eq!(json["retry"], true);
         assert_eq!(json["cause"][0]["code"], code);

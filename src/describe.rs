@@ -4,6 +4,28 @@
 mod reference;
 mod schemas;
 
+#[cfg(test)]
+pub(crate) mod contract {
+    use serde::Serialize;
+    use serde_json::Value;
+
+    use crate::error::{Failure, Report};
+
+    pub(crate) fn stdout(command: &str, output: &impl Serialize) -> Value {
+        validate(&super::schemas::stdout(command).unwrap(), output)
+    }
+
+    pub(crate) fn stderr(failure: &Failure) {
+        validate(&super::schemas::stderr(), &Report { error: failure });
+    }
+
+    fn validate(schema: &schemars::Schema, output: &impl Serialize) -> Value {
+        let value = serde_json::to_value(output).unwrap();
+        jsonschema::validate(schema.as_value(), &value).unwrap();
+        value
+    }
+}
+
 use std::{any::TypeId, borrow::Cow, io::Write, path::PathBuf};
 
 use clap::{Arg, ArgAction, Command, CommandFactory};

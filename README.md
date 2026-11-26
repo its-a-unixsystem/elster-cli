@@ -73,6 +73,8 @@ Run `cargo run -- kontoabfrage offene-betraege --profile NAME --steuernummer NUM
 
 Run `kiecli skill` for the [agent playbook](SKILL.md) and `kiecli describe` for the machine-readable command reference. Use `kiecli describe postfach abholung` to narrow it to one command. Both work offline without configuration, credentials, or ERiC.
 
+The [contract snapshot](schemas/describe.json) contains the complete command reference and the stdout and stderr JSON Schemas. After changing it, regenerate the snapshot with `cargo run --locked --quiet -- describe | jq -S . > schemas/describe.json` and record schema changes in the changelog. CI compares the snapshot with live `describe` output and checks breaking changes against the latest reachable release tag.
+
 ## Continuous integration
 
 CI checks formatting, Clippy, tests, dependency licences and advisories, and

@@ -13,6 +13,7 @@
 - `postfach abholung` writes Datenpakete and Anhänge atomically, reports their hashes and Bestätigung deadlines, and requires an explicit confirmation choice. `postfach bestaetigung` confirms by ID and reports each ELSTER result separately.
 - `kontoabfrage offene-betraege`, `zahlungen` and `sollstellungen` send ERiC Kontoabfragen, convert Bescheid-format Steuernummern, and return legacy or BIENE results as JSON.
 - `describe [command]` reports command arguments, settings, diagnostics, and JSON Schemas. `skill` prints the bundled agent playbook. Both run without configuration, credentials, or ERiC.
+- Check in the initial `describe` and JSON Schema contract. Tests check for snapshot drift, validate fake-driven command output, and enforce the version bump required for breaking changes.
 
 ### Fixed
 

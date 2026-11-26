@@ -1,0 +1,5265 @@
+{
+  "bereitstellungsdatenarten": [
+    "ANAuskunft",
+    "AenderungslisteDUe",
+    "AnhangRueckmeldung",
+    "DIVABescheid",
+    "DIVABuchmachersteuer",
+    "DIVALotteriesteuerEinmal",
+    "DIVALotteriesteuerMehr",
+    "DIVAOnlinePokerStB",
+    "DIVASportwettensteuer",
+    "DIVATotalisator",
+    "DIVAVirtuelleAutomatenStB",
+    "DivaAdvMitteilung",
+    "DivaAdvVA",
+    "DivaAdvZinsVA",
+    "DivaBescheidESt",
+    "DivaBescheidErbSt",
+    "DivaBescheidFEIN",
+    "DivaBescheidGewSt",
+    "DivaBescheidKSt",
+    "DivaBescheidSchenkSt",
+    "DivaBescheidUSt",
+    "DivaEinwilligungRM",
+    "DivaErlassMitteilung",
+    "DivaErlassVA",
+    "DivaSonstigeMitteilung",
+    "DivaSonstigerVA",
+    "DivaStundungVA",
+    "EBilanzRueckmeldung",
+    "ELOProtokoll",
+    "EPAntwort",
+    "EPAntwortKopie",
+    "EPBescheid",
+    "EPKurzmitteilung",
+    "EPMitteilung",
+    "ESB",
+    "GEWAbmeldung",
+    "GEWMB",
+    "GSB",
+    "Gewerbesteuerbescheid",
+    "KDBVollmachtRM",
+    "KMVProtokoll",
+    "LStHVVMRM",
+    "OVMVRM",
+    "OZGBescheid",
+    "OZGMitteilung",
+    "USB",
+    "VDBKDBRueckmeldungLief",
+    "VerbindlicheAuskunft",
+    "VerbindlicheZusage"
+  ],
+  "commands": [
+    {
+      "about": "Install or inspect ERiC and Otto",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "eric",
+      "stdout_format": null,
+      "stdout_schema": null
+    },
+    {
+      "about": "Test-load ERiC and Otto without contacting ELSTER",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "eric status",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "LibraryPaths": {
+            "properties": {
+              "eric": {
+                "type": "string"
+              },
+              "otto": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "eric",
+              "otto"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "eric_dir": {
+            "type": "string"
+          },
+          "library_paths": {
+            "$ref": "#/$defs/LibraryPaths"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supported": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "supported_majors": {
+            "items": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "terms_accepted": {
+            "type": "boolean"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "test_load": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "eric_dir",
+          "version",
+          "supported",
+          "terms_accepted",
+          "library_paths",
+          "supported_majors",
+          "test_load",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Status",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Download, verify and activate ERiC and Otto",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "44.3.6.0"
+          ],
+          "help": "ERiC package version to install",
+          "id": "version",
+          "long": "version",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "VERSION"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Confirm that you have read and accept the ERiC terms and data-protection notice",
+          "id": "accept_eric_terms",
+          "long": "accept-eric-terms",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "ACCEPT_ERIC_TERMS"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Trusted SHA-256 for an unpinned package version",
+          "id": "sha256",
+          "long": "sha256",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "HEX"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "eric install",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "data_protection_notice": {
+            "type": "string"
+          },
+          "eric_dir": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "version",
+          "eric_dir",
+          "license",
+          "data_protection_notice",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Installed",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Inspect local configuration",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "config",
+      "stdout_format": null,
+      "stdout_schema": null
+    },
+    {
+      "about": "Show effective settings and their sources without using credentials",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "config show",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Shown": {
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "value",
+              "source"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "bundesland": {
+            "$ref": "#/$defs/Shown"
+          },
+          "certificate": {
+            "$ref": "#/$defs/Shown"
+          },
+          "config": {
+            "$ref": "#/$defs/Shown"
+          },
+          "eric_dir": {
+            "$ref": "#/$defs/Shown"
+          },
+          "hersteller_id": {
+            "$ref": "#/$defs/Shown"
+          },
+          "pin": {
+            "$ref": "#/$defs/Shown"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile_source": {
+            "type": "string"
+          },
+          "steuernummer": {
+            "$ref": "#/$defs/Shown"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "test_source": {
+            "type": "string"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "config",
+          "eric_dir",
+          "certificate",
+          "pin",
+          "hersteller_id",
+          "steuernummer",
+          "bundesland",
+          "profile",
+          "profile_source",
+          "test",
+          "test_source",
+          "warnings"
+        ],
+        "title": "Show",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Inspect a local ELSTER Certificate",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "zertifikat",
+      "stdout_format": null,
+      "stdout_schema": null
+    },
+    {
+      "about": "Open a Certificate with its PIN without contacting ELSTER",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "zertifikat status",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Block": {
+            "properties": {
+              "gueltig_ab": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "gueltig_bis": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "identifikationsmerkmaltyp": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "issuer": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Name"
+                },
+                "type": "array"
+              },
+              "public_key_sha1": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "schluessellaenge": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "signaturalgorithmus": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "subjekt": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Name"
+                },
+                "type": "array"
+              },
+              "verifikationsart": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "gueltig_ab",
+              "gueltig_bis",
+              "signaturalgorithmus",
+              "schluessellaenge",
+              "public_key_sha1",
+              "issuer",
+              "subjekt",
+              "identifikationsmerkmaltyp",
+              "verifikationsart"
+            ],
+            "type": "object"
+          },
+          "Name": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "abgelaufen": {
+            "type": "boolean"
+          },
+          "gueltig_ab": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "gueltig_bis": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "konto_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organisationszertifikat": {
+            "type": "boolean"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registrierertyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signaturzertifikat": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Block"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tage_verbleibend": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "testzertifikat": {
+            "type": "boolean"
+          },
+          "token_typ": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "verschluesselungszertifikat": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Block"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "gueltig_ab",
+          "gueltig_bis",
+          "tage_verbleibend",
+          "abgelaufen",
+          "testzertifikat",
+          "registrierertyp",
+          "organisationszertifikat",
+          "token_typ",
+          "konto_id",
+          "verschluesselungszertifikat",
+          "signaturzertifikat",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Status",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Read the Taxpayer's Postfach",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "postfach",
+      "stdout_format": null,
+      "stdout_schema": null
+    },
+    {
+      "about": "Show ELSTER's Postfach counts as a hint; ELSTER may omit some kinds",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include only this Bereitstellungsdatenart (repeatable, case-sensitive)",
+          "id": "datenart",
+          "long": "datenart",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NAME"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten from this date (YYYY-MM-DD)",
+          "id": "von",
+          "long": "von",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten through this date (YYYY-MM-DD)",
+          "id": "bis",
+          "long": "bis",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [
+            "alle"
+          ],
+          "default_values": [
+            "true"
+          ],
+          "help": "Include only Nachrichten not yet confirmed (default)",
+          "id": "neue",
+          "long": "neue",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NEUE"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Include already confirmed Nachrichten",
+          "id": "alle",
+          "long": "alle",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "ALLE"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "postfach status",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Count": {
+            "properties": {
+              "anzahl": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "anzahl"
+            ],
+            "type": "object"
+          },
+          "Einschraenkung": {
+            "enum": [
+              "neue",
+              "alle"
+            ],
+            "type": "string"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "bereitstellungsdatenarten": {
+            "items": {
+              "$ref": "#/$defs/Count"
+            },
+            "type": "array"
+          },
+          "einschraenkung": {
+            "$ref": "#/$defs/Einschraenkung"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bereitstellungsdatenarten",
+          "einschraenkung",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "List Postfach metadata without collecting or confirming Nachrichten",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include only this Bereitstellungsdatenart (repeatable, case-sensitive)",
+          "id": "datenart",
+          "long": "datenart",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NAME"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten from this date (YYYY-MM-DD)",
+          "id": "von",
+          "long": "von",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten through this date (YYYY-MM-DD)",
+          "id": "bis",
+          "long": "bis",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [
+            "alle"
+          ],
+          "default_values": [
+            "true"
+          ],
+          "help": "Include only Nachrichten not yet confirmed (default)",
+          "id": "neue",
+          "long": "neue",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NEUE"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Include already confirmed Nachrichten",
+          "id": "alle",
+          "long": "alle",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "ALLE"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "postfach anfrage",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Anhang": {
+            "properties": {
+              "dateibezeichnung": {
+                "type": "string"
+              },
+              "dateiname": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dateityp": {
+                "type": "string"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "meta": {
+                "items": {
+                  "$ref": "#/$defs/AttachmentMeta"
+                },
+                "type": "array"
+              },
+              "objektid": {
+                "type": "string"
+              },
+              "position": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "position",
+              "dateiname",
+              "dateibezeichnung",
+              "dateityp",
+              "objektid",
+              "groesse",
+              "meta"
+            ],
+            "type": "object"
+          },
+          "Anschreiben": {
+            "properties": {
+              "bezeichnung": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sendername": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "sendername",
+              "bezeichnung",
+              "text"
+            ],
+            "type": "object"
+          },
+          "AttachmentMeta": {
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "Datenpaket": {
+            "properties": {
+              "encoding": {
+                "type": "string"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "objektid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "objektid",
+              "encoding",
+              "groesse"
+            ],
+            "type": "object"
+          },
+          "Meta": {
+            "properties": {
+              "coding": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "default": "",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "MetaList": {
+            "properties": {
+              "elements": {
+                "items": {
+                  "$ref": "#/$defs/MetaListElement"
+                },
+                "type": "array"
+              },
+              "typ": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "typ",
+              "elements"
+            ],
+            "type": "object"
+          },
+          "MetaListElement": {
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "default": "",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "MetaMap": {
+            "properties": {
+              "meta": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Meta"
+                },
+                "type": "array"
+              },
+              "meta_lists": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/MetaList"
+                },
+                "type": "array"
+              },
+              "typ": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "typ",
+              "meta",
+              "meta_lists"
+            ],
+            "type": "object"
+          },
+          "Nachricht": {
+            "properties": {
+              "anhaenge": {
+                "items": {
+                  "$ref": "#/$defs/Anhang"
+                },
+                "type": "array"
+              },
+              "anschreiben": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Anschreiben"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bereitstellungsdatenart": {
+                "type": "string"
+              },
+              "bereitstellungsticket": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "datenpaket": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Datenpaket"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "type": "string"
+              },
+              "meta": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "meta_maps": {
+                "items": {
+                  "$ref": "#/$defs/MetaMap"
+                },
+                "type": "array"
+              },
+              "verfuegbar_bis": {
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "bereitstellungsdatenart",
+              "bereitstellungsticket",
+              "verfuegbar_bis",
+              "groesse",
+              "meta",
+              "anschreiben",
+              "meta_maps",
+              "datenpaket",
+              "anhaenge"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "postfach_nachrichten": {
+            "items": {
+              "$ref": "#/$defs/Nachricht"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "postfach_nachrichten",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Collect Datenpakete and Anhänge; explicitly choose whether to confirm them",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Collect this Postfach-Nachricht, including if already confirmed (repeatable)",
+          "id": "id",
+          "long": "id",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "ID"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Collect Postfach-Nachrichten that are not yet confirmed",
+          "id": "neue",
+          "long": "neue",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NEUE"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Directory for the collected files",
+          "id": "out",
+          "long": "out",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": true,
+          "short": null,
+          "value_names": [
+            "DIR"
+          ],
+          "value_type": "path"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Confirm receipt only after all files of a Nachricht are safely written",
+          "id": "bestaetigen",
+          "long": "bestaetigen",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "BESTAETIGEN"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Do not confirm receipt; report when each Bestätigung is due",
+          "id": "ohne_bestaetigung",
+          "long": "ohne-bestaetigung",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "OHNE_BESTAETIGUNG"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Include Anfrage metadata in the output (never in a separate file)",
+          "id": "mit_meta",
+          "long": "mit-meta",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "MIT_META"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include only this Bereitstellungsdatenart (repeatable, case-sensitive)",
+          "id": "datenart",
+          "long": "datenart",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "NAME"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten from this date (YYYY-MM-DD)",
+          "id": "von",
+          "long": "von",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include Nachrichten through this date (YYYY-MM-DD)",
+          "id": "bis",
+          "long": "bis",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [
+        {
+          "arguments": [
+            "id",
+            "neue"
+          ],
+          "name": "selection",
+          "required": true
+        },
+        {
+          "arguments": [
+            "bestaetigen",
+            "ohne_bestaetigung"
+          ],
+          "name": "confirmation",
+          "required": true
+        }
+      ],
+      "path": "postfach abholung",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Anhang": {
+            "properties": {
+              "dateibezeichnung": {
+                "type": "string"
+              },
+              "dateiname": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dateityp": {
+                "type": "string"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "meta": {
+                "items": {
+                  "$ref": "#/$defs/AttachmentMeta"
+                },
+                "type": "array"
+              },
+              "objektid": {
+                "type": "string"
+              },
+              "position": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "position",
+              "dateiname",
+              "dateibezeichnung",
+              "dateityp",
+              "objektid",
+              "groesse",
+              "meta"
+            ],
+            "type": "object"
+          },
+          "Anschreiben": {
+            "properties": {
+              "bezeichnung": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sendername": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "sendername",
+              "bezeichnung",
+              "text"
+            ],
+            "type": "object"
+          },
+          "AttachmentMeta": {
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "Cause": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "source": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source"
+            ],
+            "type": "object"
+          },
+          "Collected": {
+            "properties": {
+              "abgeholt_am": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "anhaenge": {
+                "items": {
+                  "$ref": "#/$defs/Anhang"
+                },
+                "type": "array"
+              },
+              "anschreiben": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Anschreiben"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bereitstellungsdatenart": {
+                "type": "string"
+              },
+              "bereitstellungsticket": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "bestaetigt": {
+                "type": "boolean"
+              },
+              "bestaetigung_faellig_bis": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "datenpaket": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Datenpaket"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fehler": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Failure"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "files": {
+                "items": {
+                  "$ref": "#/$defs/WrittenFile"
+                },
+                "type": "array"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "type": "string"
+              },
+              "meta": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "meta_maps": {
+                "items": {
+                  "$ref": "#/$defs/MetaMap"
+                },
+                "type": "array"
+              },
+              "status": {
+                "$ref": "#/$defs/Status"
+              },
+              "verfuegbar_bis": {
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "abgeholt_am",
+              "files",
+              "bestaetigt",
+              "bestaetigung_faellig_bis",
+              "fehler"
+            ],
+            "type": "object"
+          },
+          "Datenpaket": {
+            "properties": {
+              "encoding": {
+                "type": "string"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "objektid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "objektid",
+              "encoding",
+              "groesse"
+            ],
+            "type": "object"
+          },
+          "Failure": {
+            "properties": {
+              "cause": {
+                "items": {
+                  "$ref": "#/$defs/Cause"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "code": {
+                "type": "string"
+              },
+              "help": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "notes": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "retry": {
+                "type": "boolean"
+              },
+              "suggestion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retry"
+            ],
+            "type": "object"
+          },
+          "Meta": {
+            "properties": {
+              "coding": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "default": "",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "MetaList": {
+            "properties": {
+              "elements": {
+                "items": {
+                  "$ref": "#/$defs/MetaListElement"
+                },
+                "type": "array"
+              },
+              "typ": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "typ",
+              "elements"
+            ],
+            "type": "object"
+          },
+          "MetaListElement": {
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "default": "",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "MetaMap": {
+            "properties": {
+              "meta": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Meta"
+                },
+                "type": "array"
+              },
+              "meta_lists": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/MetaList"
+                },
+                "type": "array"
+              },
+              "typ": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "typ",
+              "meta",
+              "meta_lists"
+            ],
+            "type": "object"
+          },
+          "Role": {
+            "enum": [
+              "datenpaket",
+              "anhang"
+            ],
+            "type": "string"
+          },
+          "Status": {
+            "enum": [
+              "vollstaendig",
+              "teilweise",
+              "fehlgeschlagen"
+            ],
+            "type": "string"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "WrittenFile": {
+            "properties": {
+              "encoding": {
+                "type": "string"
+              },
+              "groesse": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "path": {
+                "type": "string"
+              },
+              "position": {
+                "format": "uint",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "role": {
+                "$ref": "#/$defs/Role"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "groesse",
+              "sha256",
+              "role",
+              "position"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "postfach_nachrichten": {
+            "items": {
+              "$ref": "#/$defs/Collected"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "postfach_nachrichten",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Confirm receipt of the specified Postfach-Nachrichten",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Confirm this Postfach-Nachricht ID (repeatable)",
+          "id": "id",
+          "long": "id",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": true,
+          "short": null,
+          "value_names": [
+            "ID"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "postfach bestaetigung",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Cause": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "source": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source"
+            ],
+            "type": "object"
+          },
+          "Confirmation": {
+            "properties": {
+              "bestaetigt": {
+                "type": "boolean"
+              },
+              "fehler": {
+                "properties": {
+                  "cause": {
+                    "items": {
+                      "$ref": "#/$defs/Cause"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "help": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "retry": {
+                    "type": "boolean"
+                  },
+                  "suggestion": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retry"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "rueckgabe": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ConfirmationCode"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "bestaetigt",
+              "rueckgabe"
+            ],
+            "type": "object"
+          },
+          "ConfirmationCode": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "text"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "postfach_nachrichten": {
+            "items": {
+              "$ref": "#/$defs/Confirmation"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "postfach_nachrichten",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Query the Taxpayer's tax account",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "kontoabfrage",
+      "stdout_format": null,
+      "stdout_schema": null
+    },
+    {
+      "about": "Query open amounts on the tax account",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "kontoabfrage offene-betraege",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "AltSteuerart": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtbetrag": {
+                "type": "string"
+              },
+              "klartext": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "teilbetraege": {
+                "items": {
+                  "$ref": "#/$defs/AltTeilbetrag"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "klartext",
+              "teilbetraege"
+            ],
+            "type": "object"
+          },
+          "AltTeilbetrag": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "faelligkeit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "wert": {
+                "type": "string"
+              },
+              "zeitraum": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "zeitraum",
+              "faelligkeit"
+            ],
+            "type": "object"
+          },
+          "Hinweis": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          },
+          "Summe": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "Teil": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "alt"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "steuerarten"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "biene"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "zeilen",
+                    "summen"
+                  ]
+                }
+              },
+              {
+                "dependentRequired": {
+                  "steuerarten": [
+                    "antwort_format"
+                  ],
+                  "summen": [
+                    "antwort_format"
+                  ],
+                  "zeilen": [
+                    "antwort_format"
+                  ]
+                }
+              }
+            ],
+            "properties": {
+              "ab": {
+                "description": "Date as [year, ordinal day].",
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  {
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              "abfrage_tagesdatum": {
+                "type": "string"
+              },
+              "antwort_format": {
+                "enum": [
+                  "alt",
+                  "biene"
+                ],
+                "type": "string"
+              },
+              "bearbeitungshinweis": {
+                "$ref": "#/$defs/Hinweis"
+              },
+              "ein_jahr": {
+                "type": "boolean"
+              },
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtsumme": {
+                "type": "string"
+              },
+              "jahr": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "steuerart": {
+                "type": "string"
+              },
+              "steuerarten": {
+                "items": {
+                  "$ref": "#/$defs/AltSteuerart"
+                },
+                "type": "array"
+              },
+              "stpfl": {
+                "properties": {
+                  "abfragedatum": {
+                    "type": "string"
+                  },
+                  "finanzamt": {
+                    "type": "string"
+                  },
+                  "kein_leistungsgebot": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "steuernummer": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "summen": {
+                "items": {
+                  "$ref": "#/$defs/Summe"
+                },
+                "type": "array"
+              },
+              "zeilen": {
+                "items": {
+                  "$ref": "#/$defs/Zeile"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "bearbeitungshinweis"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "Zeile": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "erlaeuterungen": {
+                "type": "string"
+              },
+              "faelligkeit_wertstellung": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "abfrageart": {
+            "type": "string"
+          },
+          "bundesfinanzamtsnummer": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steuernummer": {
+            "type": "string"
+          },
+          "teile": {
+            "items": {
+              "$ref": "#/$defs/Teil"
+            },
+            "type": "array"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          },
+          "xml": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "steuernummer",
+          "bundesfinanzamtsnummer",
+          "abfrageart",
+          "teile",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Query payments made to the tax account",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Include payments posted on or after this date (YYYY-MM-DD)",
+          "id": "ab",
+          "long": "ab",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": true,
+          "short": null,
+          "value_names": [
+            "DATE"
+          ],
+          "value_type": "date"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "false"
+          ],
+          "help": "Limit the search to one year from --ab",
+          "id": "ein_jahr",
+          "long": "ein-jahr",
+          "position": null,
+          "possible_values": [
+            "true",
+            "false"
+          ],
+          "repeatable": false,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "EIN_JAHR"
+          ],
+          "value_type": "boolean"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [
+            "alle"
+          ],
+          "help": "Tax type (repeatable, case-insensitive; defaults to all)",
+          "id": "steuerarten",
+          "long": "steuerart",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "TYPE"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "kontoabfrage zahlungen",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "AltSteuerart": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtbetrag": {
+                "type": "string"
+              },
+              "klartext": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "teilbetraege": {
+                "items": {
+                  "$ref": "#/$defs/AltTeilbetrag"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "klartext",
+              "teilbetraege"
+            ],
+            "type": "object"
+          },
+          "AltTeilbetrag": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "faelligkeit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "wert": {
+                "type": "string"
+              },
+              "zeitraum": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "zeitraum",
+              "faelligkeit"
+            ],
+            "type": "object"
+          },
+          "Hinweis": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          },
+          "Summe": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "Teil": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "alt"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "steuerarten"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "biene"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "zeilen",
+                    "summen"
+                  ]
+                }
+              },
+              {
+                "dependentRequired": {
+                  "steuerarten": [
+                    "antwort_format"
+                  ],
+                  "summen": [
+                    "antwort_format"
+                  ],
+                  "zeilen": [
+                    "antwort_format"
+                  ]
+                }
+              }
+            ],
+            "properties": {
+              "ab": {
+                "description": "Date as [year, ordinal day].",
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  {
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              "abfrage_tagesdatum": {
+                "type": "string"
+              },
+              "antwort_format": {
+                "enum": [
+                  "alt",
+                  "biene"
+                ],
+                "type": "string"
+              },
+              "bearbeitungshinweis": {
+                "$ref": "#/$defs/Hinweis"
+              },
+              "ein_jahr": {
+                "type": "boolean"
+              },
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtsumme": {
+                "type": "string"
+              },
+              "jahr": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "steuerart": {
+                "type": "string"
+              },
+              "steuerarten": {
+                "items": {
+                  "$ref": "#/$defs/AltSteuerart"
+                },
+                "type": "array"
+              },
+              "stpfl": {
+                "properties": {
+                  "abfragedatum": {
+                    "type": "string"
+                  },
+                  "finanzamt": {
+                    "type": "string"
+                  },
+                  "kein_leistungsgebot": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "steuernummer": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "summen": {
+                "items": {
+                  "$ref": "#/$defs/Summe"
+                },
+                "type": "array"
+              },
+              "zeilen": {
+                "items": {
+                  "$ref": "#/$defs/Zeile"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "bearbeitungshinweis"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "Zeile": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "erlaeuterungen": {
+                "type": "string"
+              },
+              "faelligkeit_wertstellung": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "abfrageart": {
+            "type": "string"
+          },
+          "bundesfinanzamtsnummer": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steuernummer": {
+            "type": "string"
+          },
+          "teile": {
+            "items": {
+              "$ref": "#/$defs/Teil"
+            },
+            "type": "array"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          },
+          "xml": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "steuernummer",
+          "bundesfinanzamtsnummer",
+          "abfrageart",
+          "teile",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Query amounts assessed on the tax account",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Tax type (repeatable, case-insensitive)",
+          "id": "steuerarten",
+          "long": "steuerart",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": true,
+          "short": null,
+          "value_names": [
+            "TYPE"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Assessment year (repeatable)",
+          "id": "jahre",
+          "long": "jahr",
+          "position": null,
+          "possible_values": [],
+          "repeatable": true,
+          "required": true,
+          "short": null,
+          "value_names": [
+            "YEAR"
+          ],
+          "value_type": "integer"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "kontoabfrage sollstellungen",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "AltSteuerart": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtbetrag": {
+                "type": "string"
+              },
+              "klartext": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "teilbetraege": {
+                "items": {
+                  "$ref": "#/$defs/AltTeilbetrag"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "klartext",
+              "teilbetraege"
+            ],
+            "type": "object"
+          },
+          "AltTeilbetrag": {
+            "properties": {
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "faelligkeit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "wert": {
+                "type": "string"
+              },
+              "zeitraum": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "zeitraum",
+              "faelligkeit"
+            ],
+            "type": "object"
+          },
+          "Hinweis": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          },
+          "Summe": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "Teil": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "alt"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "steuerarten"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "antwort_format": {
+                      "const": "biene"
+                    }
+                  },
+                  "required": [
+                    "antwort_format"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "zeilen",
+                    "summen"
+                  ]
+                }
+              },
+              {
+                "dependentRequired": {
+                  "steuerarten": [
+                    "antwort_format"
+                  ],
+                  "summen": [
+                    "antwort_format"
+                  ],
+                  "zeilen": [
+                    "antwort_format"
+                  ]
+                }
+              }
+            ],
+            "properties": {
+              "ab": {
+                "description": "Date as [year, ordinal day].",
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  {
+                    "format": "uint16",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              "abfrage_tagesdatum": {
+                "type": "string"
+              },
+              "antwort_format": {
+                "enum": [
+                  "alt",
+                  "biene"
+                ],
+                "type": "string"
+              },
+              "bearbeitungshinweis": {
+                "$ref": "#/$defs/Hinweis"
+              },
+              "ein_jahr": {
+                "type": "boolean"
+              },
+              "erlaeuterung": {
+                "type": "string"
+              },
+              "gesamtsumme": {
+                "type": "string"
+              },
+              "jahr": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "steuerart": {
+                "type": "string"
+              },
+              "steuerarten": {
+                "items": {
+                  "$ref": "#/$defs/AltSteuerart"
+                },
+                "type": "array"
+              },
+              "stpfl": {
+                "properties": {
+                  "abfragedatum": {
+                    "type": "string"
+                  },
+                  "finanzamt": {
+                    "type": "string"
+                  },
+                  "kein_leistungsgebot": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "steuernummer": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "summen": {
+                "items": {
+                  "$ref": "#/$defs/Summe"
+                },
+                "type": "array"
+              },
+              "zeilen": {
+                "items": {
+                  "$ref": "#/$defs/Zeile"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "bearbeitungshinweis"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "Zeile": {
+            "properties": {
+              "abfluss": {
+                "type": "string"
+              },
+              "betrag": {
+                "type": "string"
+              },
+              "erlaeuterungen": {
+                "type": "string"
+              },
+              "faelligkeit_wertstellung": {
+                "type": "string"
+              },
+              "offen_forderung": {
+                "type": "string"
+              },
+              "offen_verbindlichkeit": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "zufluss": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "abfrageart": {
+            "type": "string"
+          },
+          "bundesfinanzamtsnummer": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steuernummer": {
+            "type": "string"
+          },
+          "teile": {
+            "items": {
+              "$ref": "#/$defs/Teil"
+            },
+            "type": "array"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          },
+          "xml": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "steuernummer",
+          "bundesfinanzamtsnummer",
+          "abfrageart",
+          "teile",
+          "test",
+          "profile",
+          "warnings"
+        ],
+        "title": "Output",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Describe the CLI and its JSON contracts without loading configuration",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Optional command path, such as `postfach abholung`",
+          "id": "command",
+          "long": null,
+          "position": 1,
+          "possible_values": [],
+          "repeatable": true,
+          "required": false,
+          "short": null,
+          "value_names": [
+            "COMMAND"
+          ],
+          "value_type": "string"
+        },
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "describe",
+      "stdout_format": "json",
+      "stdout_schema": {
+        "$defs": {
+          "Argument": {
+            "properties": {
+              "conflicts_with": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "default_values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "help": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "long": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "position": {
+                "format": "uint",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "possible_values": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "repeatable": {
+                "type": "boolean"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "short": {
+                "maxLength": 1,
+                "minLength": 1,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value_names": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "value_type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "long",
+              "short",
+              "position",
+              "help",
+              "value_type",
+              "value_names",
+              "possible_values",
+              "default_values",
+              "required",
+              "repeatable",
+              "conflicts_with"
+            ],
+            "type": "object"
+          },
+          "Code": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "meaning": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "meaning"
+            ],
+            "type": "object"
+          },
+          "CommandDescription": {
+            "properties": {
+              "about": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "arguments": {
+                "items": {
+                  "$ref": "#/$defs/Argument"
+                },
+                "type": "array"
+              },
+              "exclusive_groups": {
+                "items": {
+                  "$ref": "#/$defs/ExclusiveGroup"
+                },
+                "type": "array"
+              },
+              "path": {
+                "type": "string"
+              },
+              "stdout_format": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stdout_schema": {
+                "additionalProperties": true,
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "about",
+              "arguments",
+              "exclusive_groups",
+              "stdout_format",
+              "stdout_schema"
+            ],
+            "type": "object"
+          },
+          "DefaultValue": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "ExclusiveGroup": {
+            "properties": {
+              "arguments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "arguments",
+              "required"
+            ],
+            "type": "object"
+          },
+          "ExitCode": {
+            "properties": {
+              "code": {
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "meaning": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "meaning"
+            ],
+            "type": "object"
+          },
+          "KontoabfrageCode": {
+            "properties": {
+              "code": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "exit": {
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "meaning": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "exit",
+              "meaning"
+            ],
+            "type": "object"
+          },
+          "Scope": {
+            "enum": [
+              "profile",
+              "top-level",
+              "invocation"
+            ],
+            "type": "string"
+          },
+          "Setting": {
+            "properties": {
+              "default": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DefaultValue"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "meaning": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scope": {
+                "$ref": "#/$defs/Scope"
+              },
+              "sources": {
+                "items": {
+                  "$ref": "#/$defs/SettingSource"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "sources",
+              "scope",
+              "default",
+              "meaning"
+            ],
+            "type": "object"
+          },
+          "SettingSource": {
+            "properties": {
+              "config_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "env": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "flag": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "flag",
+              "env",
+              "config_key"
+            ],
+            "type": "object"
+          },
+          "TraceEvent": {
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "format": "uint128",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "page": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "call",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          "Warning": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "bereitstellungsdatenarten": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/$defs/CommandDescription"
+            },
+            "type": "array"
+          },
+          "error_codes": {
+            "items": {
+              "$ref": "#/$defs/Code"
+            },
+            "type": "array"
+          },
+          "exit_codes": {
+            "items": {
+              "$ref": "#/$defs/ExitCode"
+            },
+            "type": "array"
+          },
+          "global_arguments": {
+            "items": {
+              "$ref": "#/$defs/Argument"
+            },
+            "type": "array"
+          },
+          "global_exclusive_groups": {
+            "items": {
+              "$ref": "#/$defs/ExclusiveGroup"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "kontoabfrage_result_codes": {
+            "items": {
+              "$ref": "#/$defs/KontoabfrageCode"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settings": {
+            "items": {
+              "$ref": "#/$defs/Setting"
+            },
+            "type": "array"
+          },
+          "stderr_schema": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "steuerarten": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/$defs/TraceEvent"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          },
+          "warning_codes": {
+            "items": {
+              "$ref": "#/$defs/Code"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/Warning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "version",
+          "test",
+          "profile",
+          "warnings",
+          "global_arguments",
+          "global_exclusive_groups",
+          "commands",
+          "settings",
+          "exit_codes",
+          "error_codes",
+          "warning_codes",
+          "bereitstellungsdatenarten",
+          "steuerarten",
+          "kontoabfrage_result_codes",
+          "stderr_schema"
+        ],
+        "title": "Description",
+        "type": "object"
+      }
+    },
+    {
+      "about": "Print the agent skill as Markdown",
+      "arguments": [
+        {
+          "conflicts_with": [],
+          "default_values": [],
+          "help": "Print help",
+          "id": "help",
+          "long": "help",
+          "position": null,
+          "possible_values": [],
+          "repeatable": false,
+          "required": false,
+          "short": "h",
+          "value_names": [],
+          "value_type": "boolean"
+        }
+      ],
+      "exclusive_groups": [],
+      "path": "skill",
+      "stdout_format": "markdown",
+      "stdout_schema": null
+    }
+  ],
+  "error_codes": [
+    {
+      "code": "abholung_partial",
+      "meaning": "At least one Postfach-Nachricht was not collected completely or its requested Bestätigung failed."
+    },
+    {
+      "code": "bestaetigung_partial",
+      "meaning": "ELSTER did not confirm every requested Postfach-Nachricht."
+    },
+    {
+      "code": "bundesland_invalid",
+      "meaning": "The supplied Bundesland code is unknown."
+    },
+    {
+      "code": "bundesland_required",
+      "meaning": "A Bescheid-format Steuernummer requires a Bundesland."
+    },
+    {
+      "code": "certificate_expired",
+      "meaning": "The Certificate's validity period has ended."
+    },
+    {
+      "code": "certificate_inspection_failed",
+      "meaning": "ERiC failed to inspect the Certificate."
+    },
+    {
+      "code": "certificate_not_admitted",
+      "meaning": "ELSTER did not admit the Certificate for this procedure."
+    },
+    {
+      "code": "certificate_not_found",
+      "meaning": "The Certificate path is missing or is not a readable file."
+    },
+    {
+      "code": "certificate_not_yet_valid",
+      "meaning": "The Certificate's validity period has not started."
+    },
+    {
+      "code": "certificate_properties_invalid",
+      "meaning": "ERiC returned missing or invalid Certificate properties."
+    },
+    {
+      "code": "certificate_unreadable",
+      "meaning": "ERiC could not open the Certificate."
+    },
+    {
+      "code": "config_invalid",
+      "meaning": "The configuration file contains invalid TOML or an invalid setting value or type."
+    },
+    {
+      "code": "config_unknown_key",
+      "meaning": "The configuration file contains a key not supported in that scope."
+    },
+    {
+      "code": "config_unreadable",
+      "meaning": "The configuration file could not be read."
+    },
+    {
+      "code": "datenart_not_released",
+      "meaning": "ELSTER has not released the Bereitstellungsdatenart."
+    },
+    {
+      "code": "datenart_unknown",
+      "meaning": "The supplied Bereitstellungsdatenart name is unknown."
+    },
+    {
+      "code": "elster_rejected",
+      "meaning": "ELSTER rejected the Postfach request."
+    },
+    {
+      "code": "environment_invalid",
+      "meaning": "An environment setting is not valid UTF-8."
+    },
+    {
+      "code": "eric_archive_invalid",
+      "meaning": "The ERiC archive could not be unpacked or its layout is invalid."
+    },
+    {
+      "code": "eric_buffer_failed",
+      "meaning": "ERiC could not create a return buffer."
+    },
+    {
+      "code": "eric_dir_unresolved",
+      "meaning": "The default ERiC directory could not be determined."
+    },
+    {
+      "code": "eric_download_failed",
+      "meaning": "Downloading the ERiC package failed."
+    },
+    {
+      "code": "eric_download_too_large",
+      "meaning": "The ERiC download exceeded the size limit."
+    },
+    {
+      "code": "eric_end_failed",
+      "meaning": "ERiC could not be shut down cleanly."
+    },
+    {
+      "code": "eric_init_failed",
+      "meaning": "ERiC initialization failed."
+    },
+    {
+      "code": "eric_install_failed",
+      "meaning": "The ERiC installation could not be prepared or activated."
+    },
+    {
+      "code": "eric_installation_invalid",
+      "meaning": "The installed ERiC directory lacks the expected layout."
+    },
+    {
+      "code": "eric_libgcc_missing",
+      "meaning": "The dynamic loader could not find libgcc_s.so.1."
+    },
+    {
+      "code": "eric_load_failed",
+      "meaning": "An ERiC or Otto library could not be located or loaded."
+    },
+    {
+      "code": "eric_log_unavailable",
+      "meaning": "The ERiC log directory could not be created."
+    },
+    {
+      "code": "eric_missing",
+      "meaning": "ERiC is not installed in the selected directory."
+    },
+    {
+      "code": "eric_network_failed",
+      "meaning": "ERiC could not communicate with ELSTER."
+    },
+    {
+      "code": "eric_process_failed",
+      "meaning": "ERiC failed to process the request."
+    },
+    {
+      "code": "eric_redirect_refused",
+      "meaning": "The ERiC download redirect was unsafe, invalid, or exceeded the redirect limit."
+    },
+    {
+      "code": "eric_sha256_conflict",
+      "meaning": "The supplied hash conflicts with the pinned ERiC package hash."
+    },
+    {
+      "code": "eric_sha256_invalid",
+      "meaning": "The supplied SHA-256 hash is malformed."
+    },
+    {
+      "code": "eric_sha256_mismatch",
+      "meaning": "The downloaded ERiC package does not match the expected SHA-256 hash."
+    },
+    {
+      "code": "eric_sha256_required",
+      "meaning": "The unpinned ERiC package requires an expected SHA-256 hash."
+    },
+    {
+      "code": "eric_symbol_missing",
+      "meaning": "A required ERiC or Otto library symbol is missing."
+    },
+    {
+      "code": "eric_terms_not_accepted",
+      "meaning": "The ERiC terms have not been accepted for this installation."
+    },
+    {
+      "code": "eric_version_failed",
+      "meaning": "The ERiC version call failed."
+    },
+    {
+      "code": "eric_version_invalid",
+      "meaning": "The supplied or reported ERiC version is malformed."
+    },
+    {
+      "code": "eric_version_unsupported",
+      "meaning": "The selected or installed ERiC major version is unsupported."
+    },
+    {
+      "code": "hersteller_id_blocked",
+      "meaning": "ERiC blocked the HerstellerID."
+    },
+    {
+      "code": "hersteller_id_invalid",
+      "meaning": "The HerstellerID is invalid; it must contain exactly five digits."
+    },
+    {
+      "code": "hersteller_id_missing",
+      "meaning": "No HerstellerID was supplied."
+    },
+    {
+      "code": "hersteller_id_rejected",
+      "meaning": "ELSTER did not admit the HerstellerID."
+    },
+    {
+      "code": "home_unresolved",
+      "meaning": "A home-relative path could not be expanded."
+    },
+    {
+      "code": "kontoabfrage_authorization_required",
+      "meaning": "ELSTER reports that the Kontoabfrage is not authorised for this account."
+    },
+    {
+      "code": "kontoabfrage_invalid",
+      "meaning": "The Kontoabfrage response is invalid or cannot be matched to the request."
+    },
+    {
+      "code": "kontoabfrage_partial",
+      "meaning": "ELSTER reported that some Kontoabfrage Teile failed."
+    },
+    {
+      "code": "kontoabfrage_rejected",
+      "meaning": "ELSTER rejected the Kontoabfrage."
+    },
+    {
+      "code": "kontoabfrage_transient",
+      "meaning": "ELSTER's Kontoabfrage backend did not return a result; retrying may succeed."
+    },
+    {
+      "code": "otto_fetch_failed",
+      "meaning": "Otto could not fetch the object or return a valid buffer."
+    },
+    {
+      "code": "otto_init_failed",
+      "meaning": "Otto could not create an instance."
+    },
+    {
+      "code": "otto_invalid_parameter",
+      "meaning": "A parameter supplied to Otto was invalid."
+    },
+    {
+      "code": "otto_object_not_found",
+      "meaning": "OTTER did not find the object."
+    },
+    {
+      "code": "otto_transport_failed",
+      "meaning": "The OTTER transfer failed transiently."
+    },
+    {
+      "code": "otto_unauthorized",
+      "meaning": "OTTER refused authorization."
+    },
+    {
+      "code": "output_failed",
+      "meaning": "The command could not serialize or write its output."
+    },
+    {
+      "code": "path_invalid",
+      "meaning": "A path contains an interior NUL and cannot be passed to ERiC or Otto."
+    },
+    {
+      "code": "path_unresolved",
+      "meaning": "A path could not be resolved to an absolute path."
+    },
+    {
+      "code": "pin_command_failed",
+      "meaning": "The PIN command did not run successfully or did not produce a PIN."
+    },
+    {
+      "code": "pin_file_unreadable",
+      "meaning": "The PIN file could not be read."
+    },
+    {
+      "code": "pin_invalid",
+      "meaning": "The PIN is empty or contains an interior NUL."
+    },
+    {
+      "code": "pin_locked",
+      "meaning": "The Certificate PIN is locked."
+    },
+    {
+      "code": "pin_missing",
+      "meaning": "No Certificate PIN source was supplied."
+    },
+    {
+      "code": "pin_wrong",
+      "meaning": "The Certificate PIN is incorrect."
+    },
+    {
+      "code": "postfach_anfrage_invalid",
+      "meaning": "ELSTER did not return a valid PostfachAnfrage response."
+    },
+    {
+      "code": "postfach_bestaetigung_invalid",
+      "meaning": "ELSTER did not return a valid PostfachBestaetigung response."
+    },
+    {
+      "code": "postfach_nachricht_no_objects",
+      "meaning": "The Postfach-Nachricht contains no objects to collect."
+    },
+    {
+      "code": "postfach_nachricht_not_found",
+      "meaning": "The PostfachAnfrage result does not contain a requested Nachricht ID."
+    },
+    {
+      "code": "postfach_status_invalid",
+      "meaning": "ELSTER did not return a valid PostfachStatus response."
+    },
+    {
+      "code": "postfach_too_many_entries",
+      "meaning": "ELSTER found more than 500,000 matching Postfach entries."
+    },
+    {
+      "code": "postfach_write_failed",
+      "meaning": "A collected Postfach file could not be written or stored safely."
+    },
+    {
+      "code": "profile_required",
+      "meaning": "Several profiles are configured, but none was selected."
+    },
+    {
+      "code": "profile_unknown",
+      "meaning": "The selected profile does not exist."
+    },
+    {
+      "code": "steuerart_unknown",
+      "meaning": "The supplied Steuerart is unknown."
+    },
+    {
+      "code": "steuernummer_conversion_failed",
+      "meaning": "ERiC did not return a usable ELSTER-format Steuernummer."
+    },
+    {
+      "code": "steuernummer_invalid",
+      "meaning": "The supplied Steuernummer or Bundesfinanzamtsnummer is invalid."
+    },
+    {
+      "code": "steuernummer_missing",
+      "meaning": "No Steuernummer was supplied for the Kontoabfrage."
+    },
+    {
+      "code": "test_certificate_requires_testmerker",
+      "meaning": "A test Certificate cannot be used for a live request; pass --test."
+    },
+    {
+      "code": "test_invalid",
+      "meaning": "KIECLI_TEST must be 0 or 1."
+    },
+    {
+      "code": "usage_error",
+      "meaning": "The command, its arguments, or their combination is invalid."
+    }
+  ],
+  "exit_codes": [
+    {
+      "code": 0,
+      "meaning": "Success."
+    },
+    {
+      "code": 1,
+      "meaning": "Internal error."
+    },
+    {
+      "code": 2,
+      "meaning": "Usage error."
+    },
+    {
+      "code": 3,
+      "meaning": "Configuration or credentials error."
+    },
+    {
+      "code": 4,
+      "meaning": "ERiC is missing, unsupported, not usable, or its terms have not been accepted."
+    },
+    {
+      "code": 5,
+      "meaning": "ELSTER rejected the request."
+    },
+    {
+      "code": 6,
+      "meaning": "Transient failure; a retry makes sense."
+    },
+    {
+      "code": 7,
+      "meaning": "Partial failure; see the results on stdout."
+    }
+  ],
+  "global_arguments": [
+    {
+      "conflicts_with": [],
+      "default_values": [
+        "json"
+      ],
+      "help": null,
+      "id": "format",
+      "long": "format",
+      "position": null,
+      "possible_values": [
+        "json",
+        "text"
+      ],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "FORMAT"
+      ],
+      "value_type": "enum"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [
+        "false"
+      ],
+      "help": null,
+      "id": "verbose",
+      "long": null,
+      "position": null,
+      "possible_values": [
+        "true",
+        "false"
+      ],
+      "repeatable": false,
+      "required": false,
+      "short": "v",
+      "value_names": [
+        "VERBOSE"
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": null,
+      "id": "eric_log",
+      "long": "eric-log",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "DIR"
+      ],
+      "value_type": "path"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": null,
+      "id": "eric_dir",
+      "long": "eric-dir",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "ERIC_DIR"
+      ],
+      "value_type": "path"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": null,
+      "id": "config",
+      "long": "config",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "CONFIG"
+      ],
+      "value_type": "path"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": null,
+      "id": "profile",
+      "long": "profile",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "PROFILE"
+      ],
+      "value_type": "string"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [
+        "false"
+      ],
+      "help": null,
+      "id": "test",
+      "long": "test",
+      "position": null,
+      "possible_values": [
+        "true",
+        "false"
+      ],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "TEST"
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [
+        "false"
+      ],
+      "help": null,
+      "id": "no_test",
+      "long": "no-test",
+      "position": null,
+      "possible_values": [
+        "true",
+        "false"
+      ],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "NO_TEST"
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Path to the Taxpayer's Certificate",
+      "id": "certificate",
+      "long": "certificate",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "CERTIFICATE"
+      ],
+      "value_type": "path"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Read the PIN from this file when opening a Certificate",
+      "id": "pin_file",
+      "long": "pin-file",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "PIN_FILE"
+      ],
+      "value_type": "path"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Run this shell command to obtain the PIN when opening a Certificate",
+      "id": "pin_command",
+      "long": "pin-command",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "PIN_COMMAND"
+      ],
+      "value_type": "string"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "The five-digit HerstellerID",
+      "id": "hersteller_id",
+      "long": "hersteller-id",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "HERSTELLER_ID"
+      ],
+      "value_type": "string"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "The Taxpayer's Steuernummer",
+      "id": "steuernummer",
+      "long": "steuernummer",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "STEUERNUMMER"
+      ],
+      "value_type": "string"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Bundesland for a Bescheid-format Steuernummer",
+      "id": "bundesland",
+      "long": "bundesland",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "BUNDESLAND"
+      ],
+      "value_type": "string"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [
+        "false"
+      ],
+      "help": null,
+      "id": "mit_xml",
+      "long": "mit-xml",
+      "position": null,
+      "possible_values": [
+        "true",
+        "false"
+      ],
+      "repeatable": false,
+      "required": false,
+      "short": null,
+      "value_names": [
+        "MIT_XML"
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Print help",
+      "id": "help",
+      "long": "help",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": "h",
+      "value_names": [],
+      "value_type": "boolean"
+    },
+    {
+      "conflicts_with": [],
+      "default_values": [],
+      "help": "Print version",
+      "id": "version",
+      "long": "version",
+      "position": null,
+      "possible_values": [],
+      "repeatable": false,
+      "required": false,
+      "short": "V",
+      "value_names": [],
+      "value_type": "boolean"
+    }
+  ],
+  "global_exclusive_groups": [
+    {
+      "arguments": [
+        "pin_file",
+        "pin_command"
+      ],
+      "name": "pin_source",
+      "required": false
+    }
+  ],
+  "kontoabfrage_result_codes": [
+    {
+      "code": 0,
+      "exit": 0,
+      "meaning": "The Kontoabfrage succeeded (all Teile succeeded)."
+    },
+    {
+      "code": 230077012,
+      "exit": 5,
+      "meaning": "The required authorisation for the Kontoabfrage is missing."
+    },
+    {
+      "code": 950013001,
+      "exit": 7,
+      "meaning": "Some Teile of the Kontoabfrage failed."
+    },
+    {
+      "code": 950013002,
+      "exit": 5,
+      "meaning": "Every Teil of the Kontoabfrage failed."
+    },
+    {
+      "code": 950013003,
+      "exit": 5,
+      "meaning": "The tax account is inactive."
+    },
+    {
+      "code": 950017004,
+      "exit": 5,
+      "meaning": "Online access is unavailable during ongoing insolvency proceedings."
+    },
+    {
+      "code": 950017005,
+      "exit": 5,
+      "meaning": "A request parameter is not permitted."
+    },
+    {
+      "code": 950017006,
+      "exit": 5,
+      "meaning": "The requested Abfrageart is not permitted."
+    },
+    {
+      "code": 950017007,
+      "exit": 5,
+      "meaning": "A value date before 1962 is not permitted."
+    },
+    {
+      "code": 950017008,
+      "exit": 6,
+      "meaning": "The responsible Bundesland's query system returned no result."
+    },
+    {
+      "code": 950017009,
+      "exit": 5,
+      "meaning": "ELSTER could not prepare the request correctly; contact the Finanzamt."
+    },
+    {
+      "code": 950017010,
+      "exit": 5,
+      "meaning": "The Kontoabfrage request to BIENE failed."
+    },
+    {
+      "code": 950017011,
+      "exit": 5,
+      "meaning": "The account is not enabled for ELSTER Kontoabfrage."
+    },
+    {
+      "code": 950019011,
+      "exit": 6,
+      "meaning": "A target system could not be reached."
+    },
+    {
+      "code": 950019999,
+      "exit": 5,
+      "meaning": "An unexpected error occurred during the Kontoabfrage."
+    }
+  ],
+  "profile": null,
+  "settings": [
+    {
+      "default": null,
+      "meaning": "Path to the Taxpayer's Certificate.",
+      "name": "certificate",
+      "scope": "profile",
+      "sources": [
+        {
+          "config_key": "certificate",
+          "env": "KIECLI_CERTIFICATE",
+          "flag": "--certificate"
+        }
+      ]
+    },
+    {
+      "default": null,
+      "meaning": "Certificate PIN. Precedence: flag > environment > profile. In a layer, the first available source listed here wins. A literal PIN is accepted only from KIECLI_PIN.",
+      "name": "pin",
+      "scope": "profile",
+      "sources": [
+        {
+          "config_key": null,
+          "env": "KIECLI_PIN",
+          "flag": null
+        },
+        {
+          "config_key": "pin_file",
+          "env": "KIECLI_PIN_FILE",
+          "flag": "--pin-file"
+        },
+        {
+          "config_key": "pin_command",
+          "env": "KIECLI_PIN_COMMAND",
+          "flag": "--pin-command"
+        }
+      ]
+    },
+    {
+      "default": false,
+      "meaning": "Whether to send the Testmerker. KIECLI_TEST accepts 0 (live) or 1 (test).",
+      "name": "test",
+      "scope": "profile",
+      "sources": [
+        {
+          "config_key": "test",
+          "env": "KIECLI_TEST",
+          "flag": "--test"
+        },
+        {
+          "config_key": null,
+          "env": null,
+          "flag": "--no-test"
+        }
+      ]
+    },
+    {
+      "default": null,
+      "meaning": "Taxpayer's Steuernummer in ELSTER or Bescheid format, for Kontoabfrage.",
+      "name": "steuernummer",
+      "scope": "profile",
+      "sources": [
+        {
+          "config_key": "steuernummer",
+          "env": "KIECLI_STEUERNUMMER",
+          "flag": "--steuernummer"
+        }
+      ]
+    },
+    {
+      "default": null,
+      "meaning": "Two-letter Bundesland code, required for a Bescheid-format Steuernummer.",
+      "name": "bundesland",
+      "scope": "profile",
+      "sources": [
+        {
+          "config_key": "bundesland",
+          "env": "KIECLI_BUNDESLAND",
+          "flag": "--bundesland"
+        }
+      ]
+    },
+    {
+      "default": null,
+      "meaning": "Five-digit HerstellerID.",
+      "name": "hersteller_id",
+      "scope": "top-level",
+      "sources": [
+        {
+          "config_key": "hersteller_id",
+          "env": "KIECLI_HERSTELLER_ID",
+          "flag": "--hersteller-id"
+        }
+      ]
+    },
+    {
+      "default": "$XDG_DATA_HOME/kiecli/eric or ~/.local/share/kiecli/eric",
+      "meaning": "Directory where ERiC and Otto are installed.",
+      "name": "eric_dir",
+      "scope": "top-level",
+      "sources": [
+        {
+          "config_key": "eric_dir",
+          "env": "KIECLI_ERIC_DIR",
+          "flag": "--eric-dir"
+        }
+      ]
+    },
+    {
+      "default": "The only configured profile, if exactly one exists",
+      "meaning": "Selects the Taxpayer's profile. If several profiles exist, select one explicitly or set default_profile.",
+      "name": "profile",
+      "scope": "top-level",
+      "sources": [
+        {
+          "config_key": "default_profile",
+          "env": "KIECLI_PROFILE",
+          "flag": "--profile"
+        }
+      ]
+    },
+    {
+      "default": "$XDG_CONFIG_HOME/kiecli/config.toml or ~/.config/kiecli/config.toml",
+      "meaning": "Path to the TOML config file; an absent default file is allowed.",
+      "name": "config",
+      "scope": "invocation",
+      "sources": [
+        {
+          "config_key": null,
+          "env": "KIECLI_CONFIG",
+          "flag": "--config"
+        }
+      ]
+    },
+    {
+      "default": "json",
+      "meaning": "Output format: json or text.",
+      "name": "format",
+      "scope": "invocation",
+      "sources": [
+        {
+          "config_key": null,
+          "env": null,
+          "flag": "--format"
+        }
+      ]
+    },
+    {
+      "default": false,
+      "meaning": "Include a trace of calls that support tracing.",
+      "name": "verbose",
+      "scope": "invocation",
+      "sources": [
+        {
+          "config_key": null,
+          "env": null,
+          "flag": "-v"
+        }
+      ]
+    },
+    {
+      "default": "A temporary directory deleted at exit",
+      "meaning": "Keep ERiC logs in the specified directory. They may contain tax data.",
+      "name": "eric_log",
+      "scope": "invocation",
+      "sources": [
+        {
+          "config_key": null,
+          "env": null,
+          "flag": "--eric-log"
+        }
+      ]
+    }
+  ],
+  "stderr_schema": {
+    "$defs": {
+      "Cause": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
+      "Failure": {
+        "properties": {
+          "cause": {
+            "items": {
+              "$ref": "#/$defs/Cause"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "code": {
+            "type": "string"
+          },
+          "help": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "retry": {
+            "type": "boolean"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retry"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "error": {
+        "$ref": "#/$defs/Failure"
+      }
+    },
+    "required": [
+      "error"
+    ],
+    "title": "Report",
+    "type": "object"
+  },
+  "steuerarten": [
+    "alle",
+    "ESt",
+    "KSt",
+    "USt",
+    "LSt",
+    "GewSt",
+    "ZaSt",
+    "KapESt"
+  ],
+  "test": false,
+  "version": "0.1.0",
+  "warning_codes": [
+    {
+      "code": "bestaetigung_pending",
+      "meaning": "An Abholung left Nachrichten unconfirmed; confirm within 24 hours."
+    },
+    {
+      "code": "certificate_expired",
+      "meaning": "Certificate status reports an expired or not-yet-valid Certificate."
+    },
+    {
+      "code": "certificate_expires_soon",
+      "meaning": "The Certificate expires in less than 60 days."
+    },
+    {
+      "code": "env_overrides_profile",
+      "meaning": "An environment variable overrides a setting in the selected profile."
+    },
+    {
+      "code": "pin_file_permissions",
+      "meaning": "The PIN file is readable by group or others."
+    }
+  ],
+  "warnings": []
+}

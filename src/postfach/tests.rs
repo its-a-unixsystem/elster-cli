@@ -172,12 +172,25 @@ fn sends_one_read_only_status_request_and_filters_the_returned_counts() {
             "../../tests/fixtures/requests/postfach-status.xml"
         )),
     );
+    let json = crate::describe::contract::stdout(
+        "postfach status",
+        &Output {
+            results: Results::Status(StatusCounts {
+                bereitstellungsdatenarten: counts,
+                einschraenkung: scope.einschraenkung,
+            }),
+            test: true,
+            profile: None,
+            warnings,
+            trace: None,
+        },
+    );
     assert_eq!(
-        serde_json::to_value(warnings).unwrap()[0]["code"],
+        json["warnings"][0]["code"],
         "certificate_expires_soon"
     );
     assert_eq!(
-        serde_json::to_value(counts).unwrap(),
+        json["bereitstellungsdatenarten"],
         serde_json::json!([
             {"name":"ESB", "anzahl":7}
         ])
@@ -205,6 +218,7 @@ fn distinguishes_elster_rejection_from_transport_failure() {
     assert!(!request.contains("Testmerker"));
     assert!(request.contains("einschraenkung=\"neue\""));
     assert_eq!(error.exit, 5);
+    crate::describe::contract::stderr(&error);
     let error = serde_json::to_value(error).unwrap();
     assert_eq!(
         error["cause"][2],
@@ -221,6 +235,7 @@ fn distinguishes_elster_rejection_from_transport_failure() {
     .err()
     .unwrap();
     assert_eq!(error.exit, 6);
+    crate::describe::contract::stderr(&error);
     assert_eq!(serde_json::to_value(error).unwrap()["retry"], true);
 }
 
@@ -233,6 +248,7 @@ fn rejects_a_success_without_a_status_answer() {
         None,
     ));
     let error = query(&scope, &eric, true).err().unwrap();
+    crate::describe::contract::stderr(&error);
     assert_eq!(error.exit, 1);
 }
 
@@ -250,7 +266,9 @@ fn blocks_requests_outside_certificate_validity_and_in_live_mode_with_a_test_cer
     ] {
         let eric = fake((0, STATUS_REPLY, None));
         let result = query_at(&scope, &eric, test, &mut Vec::new(), instant(at));
-        assert_eq!(result.err().map(|err| err.code()), Some(expected));
+        let failure = result.err().unwrap();
+        crate::describe::contract::stderr(&failure);
+        assert_eq!(failure.code(), expected);
         assert!(eric.request.take().is_none());
     }
 }
@@ -299,16 +317,18 @@ fn anfrage_merges_pages_in_id_order_and_preserves_metadata() {
             ),
         ]
     );
-    let json = serde_json::to_value(Output {
-        results: Results::Anfrage(Messages {
-            postfach_nachrichten: nachrichten,
-        }),
-        test: true,
-        profile: None,
-        warnings: Vec::new(),
-        trace,
-    })
-    .unwrap();
+    let json = crate::describe::contract::stdout(
+        "postfach anfrage",
+        &Output {
+            results: Results::Anfrage(Messages {
+                postfach_nachrichten: nachrichten,
+            }),
+            test: true,
+            profile: None,
+            warnings: Vec::new(),
+            trace,
+        },
+    );
     assert_eq!(json["trace"][0]["page"], 1);
     assert_eq!(json["trace"][1]["page"], 2);
     let messages = json["postfach_nachrichten"].as_array().unwrap();
@@ -356,6 +376,7 @@ fn anfrage_defaults_to_all_supported_datenarten_and_rejects_a_stalled_cursor() {
         .err()
         .unwrap();
     assert_eq!(error.code(), "postfach_anfrage_invalid");
+    crate::describe::contract::stderr(&error);
     let requests = eric.requests.into_inner();
     assert_eq!(requests[0].matches("<DatenartBereitstellung ").count(), 49);
     assert!(requests[0].contains(r#"name="DivaBescheidUSt""#));

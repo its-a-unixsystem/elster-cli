@@ -25,3 +25,6 @@ ureq = { version = "3.2", default-features = false, features = ["rustls"] }
 url = "2.5"
 zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 zeroize = "1"
+
+[dev-dependencies]
+jsonschema = { version = "0.63", default-features = false }
