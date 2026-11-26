@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{ArgGroup, Args};
 use rustix::fs::{Mode, OFlags, mkdirat, openat};
+use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use time::{Duration, OffsetDateTime};
@@ -86,7 +87,7 @@ impl Options {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum Status {
     Vollstaendig,
@@ -104,15 +105,17 @@ impl Status {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Collected {
     id: String,
     status: Status,
     #[serde(with = "time::serde::rfc3339::option")]
+    #[schemars(with = "Option<String>", extend("format" = "date-time"))]
     abgeholt_am: Option<OffsetDateTime>,
     files: Vec<WrittenFile>,
     bestaetigt: bool,
     #[serde(with = "time::serde::rfc3339::option")]
+    #[schemars(with = "Option<String>", extend("format" = "date-time"))]
     bestaetigung_faellig_bis: Option<OffsetDateTime>,
     fehler: Option<Failure>,
     #[serde(flatten)]
@@ -163,22 +166,24 @@ impl Collected {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum Role {
     Datenpaket,
     Anhang,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct WrittenFile {
     #[serde(serialize_with = "serialize_path")]
+    #[schemars(with = "String")]
     path: PathBuf,
     groesse: u64,
     sha256: String,
     role: Role,
     position: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     encoding: Option<String>,
 }
 

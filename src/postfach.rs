@@ -13,6 +13,7 @@ use std::fmt::Write as _;
 use std::io::Write;
 
 use clap::Args;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize, de::IgnoredAny};
 use time::{Date, OffsetDateTime, format_description::well_known::Iso8601};
 
@@ -107,7 +108,7 @@ impl Operation {
 }
 
 // Accepted through ERiC for Datenabholung version 32; see the test-system spike.
-const DATENARTEN: &[&str] = &[
+pub(crate) const DATENARTEN: &[&str] = &[
     "ANAuskunft",
     "AenderungslisteDUe",
     "AnhangRueckmeldung",
@@ -168,15 +169,17 @@ fn parse_date(raw: &str) -> Result<Date, &'static str> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-enum Einschraenkung {
+pub(crate) enum Einschraenkung {
     Neue,
     Alle,
 }
 
+pub(crate) const DEFAULT_RESTRICTION: Einschraenkung = Einschraenkung::Neue;
+
 impl Einschraenkung {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Neue => "neue",
             Self::Alle => "alle",
@@ -291,7 +294,7 @@ impl Scope {
             if options.alle {
                 Einschraenkung::Alle
             } else {
-                Einschraenkung::Neue
+                DEFAULT_RESTRICTION
             },
             |index, name| options.correction(cli, operation, Some((index, name)), false),
         )
@@ -719,48 +722,63 @@ fn test_certificate_error() -> Failure {
     .help("Add --test to your original command (replace --no-test if present).")
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Count {
     name: String,
     anzahl: u64,
 }
 
-#[derive(Serialize)]
-#[serde(untagged)]
-enum Results {
-    Status {
-        bereitstellungsdatenarten: Vec<Count>,
-        einschraenkung: Einschraenkung,
-    },
-    Anfrage {
-        postfach_nachrichten: Vec<anfrage::Nachricht>,
-    },
-    Abholung {
-        postfach_nachrichten: Vec<abholung::Collected>,
-    },
-    Bestaetigung {
-        postfach_nachrichten: Vec<bestaetigung::Confirmation>,
-    },
+#[derive(Serialize, JsonSchema)]
+struct StatusCounts {
+    bereitstellungsdatenarten: Vec<Count>,
+    einschraenkung: Einschraenkung,
+}
+
+#[derive(Serialize, JsonSchema)]
+struct Messages<T> {
+    postfach_nachrichten: Vec<T>,
 }
 
 #[derive(Serialize)]
-struct Output {
+#[serde(untagged)]
+enum Results {
+    Status(StatusCounts),
+    Anfrage(Messages<anfrage::Nachricht>),
+    Abholung(Messages<abholung::Collected>),
+    Bestaetigung(Messages<bestaetigung::Confirmation>),
+}
+
+#[derive(Serialize, JsonSchema)]
+struct Output<T> {
     #[serde(flatten)]
-    results: Results,
+    results: T,
     test: bool,
     profile: Option<String>,
     warnings: Vec<config::Warning>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     trace: Option<Vec<eric::TraceEvent>>,
 }
 
-impl Output {
+pub(crate) fn stdout_schema(command: &str, generator: SchemaGenerator) -> Option<Schema> {
+    Some(match command {
+        "status" => generator.into_root_schema_for::<Output<StatusCounts>>(),
+        "anfrage" => generator.into_root_schema_for::<Output<Messages<anfrage::Nachricht>>>(),
+        "abholung" => generator.into_root_schema_for::<Output<Messages<abholung::Collected>>>(),
+        "bestaetigung" => {
+            generator.into_root_schema_for::<Output<Messages<bestaetigung::Confirmation>>>()
+        }
+        _ => return None,
+    })
+}
+
+impl Output<Results> {
     fn write_text(&self, mut out: impl Write) -> std::io::Result<()> {
         match &self.results {
-            Results::Status {
+            Results::Status(StatusCounts {
                 bereitstellungsdatenarten,
                 einschraenkung,
-            } => {
+            }) => {
                 writeln!(
                     out,
                     "Postfach counts (ELSTER may omit some kinds): {}",
@@ -770,24 +788,24 @@ impl Output {
                     writeln!(out, "{}: {}", count.name.escape_debug(), count.anzahl)?;
                 }
             }
-            Results::Anfrage {
+            Results::Anfrage(Messages {
                 postfach_nachrichten,
-            } => {
+            }) => {
                 writeln!(out, "Postfach-Nachrichten: {}", postfach_nachrichten.len())?;
                 for nachricht in postfach_nachrichten {
                     nachricht.write_text(&mut out)?;
                 }
             }
-            Results::Abholung {
+            Results::Abholung(Messages {
                 postfach_nachrichten,
-            } => {
+            }) => {
                 for nachricht in postfach_nachrichten {
                     nachricht.write_text(&mut out)?;
                 }
             }
-            Results::Bestaetigung {
+            Results::Bestaetigung(Messages {
                 postfach_nachrichten,
-            } => {
+            }) => {
                 for nachricht in postfach_nachrichten {
                     writeln!(
                         out,
@@ -863,17 +881,17 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
                 match command {
                     Command::Status(_) => {
                         let scope = scope.as_ref().expect("status scope");
-                        Ok(Results::Status {
-                        bereitstellungsdatenarten: scope.execute(
-                            &eric,
-                            &hersteller_id,
-                            settings.test,
-                            trace,
-                        )?,
-                        einschraenkung: scope.einschraenkung,
-                        })
+                        Ok(Results::Status(StatusCounts {
+                            bereitstellungsdatenarten: scope.execute(
+                                &eric,
+                                &hersteller_id,
+                                settings.test,
+                                trace,
+                            )?,
+                            einschraenkung: scope.einschraenkung,
+                        }))
                     }
-                    Command::Anfrage(_) => Ok(Results::Anfrage {
+                    Command::Anfrage(_) => Ok(Results::Anfrage(Messages {
                         postfach_nachrichten: anfrage::execute(
                             scope.as_ref().expect("anfrage scope"),
                             &eric,
@@ -881,7 +899,7 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
                             settings.test,
                             trace,
                         )?,
-                    }),
+                    })),
                     Command::Abholung(options) => {
                         let otto = session.otto(&path, &pin, &hersteller_id, trace)?;
                         let postfach_nachrichten = abholung::execute(
@@ -899,15 +917,17 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
                                 "Confirm collected Postfach-Nachrichten within 24 hours of Abholung.",
                             ));
                         }
-                        Ok(Results::Abholung { postfach_nachrichten })
+                        Ok(Results::Abholung(Messages {
+                            postfach_nachrichten,
+                        }))
                     }
                     Command::Bestaetigung(options) => {
                         let ids: Vec<_> = options.id.iter().map(String::as_str).collect();
-                        Ok(Results::Bestaetigung {
+                        Ok(Results::Bestaetigung(Messages {
                             postfach_nachrichten: bestaetigung::execute(
                                 &ids, &eric, &hersteller_id, settings.test, trace,
                             ),
-                        })
+                        }))
                     }
                 }
             })
@@ -948,12 +968,12 @@ pub(crate) fn run(cli: &Cli, command: &Command, mut out: impl Write) -> Result<(
     }
     .map_err(|err| Failure::new(1, "output_failed", err.to_string()))?;
     match output.results {
-        Results::Abholung {
+        Results::Abholung(Messages {
             postfach_nachrichten,
-        } => abholung::outcome(postfach_nachrichten),
-        Results::Bestaetigung {
+        }) => abholung::outcome(postfach_nachrichten),
+        Results::Bestaetigung(Messages {
             postfach_nachrichten,
-        } => confirmation_outcome(postfach_nachrichten),
+        }) => confirmation_outcome(postfach_nachrichten),
         _ => Ok(()),
     }
 }

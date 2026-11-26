@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 use std::io::{self, Write};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use time::{Date, macros::format_description};
 
@@ -168,7 +169,7 @@ struct Maps {
     maps: Vec<MetaMap>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct MetaMap {
     #[serde(rename(deserialize = "@typ"))]
     typ: String,
@@ -178,7 +179,7 @@ struct MetaMap {
     meta_lists: Vec<MetaList>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct Meta {
     #[serde(rename(deserialize = "@name"))]
     name: String,
@@ -186,12 +187,13 @@ struct Meta {
         rename(deserialize = "@coding"),
         skip_serializing_if = "Option::is_none"
     )]
+    #[schemars(required)]
     coding: Option<String>,
     #[serde(rename(deserialize = "$text"), default)]
     value: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct MetaList {
     #[serde(rename(deserialize = "@typ"))]
     typ: String,
@@ -199,7 +201,7 @@ struct MetaList {
     elements: Vec<MetaListElement>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct MetaListElement {
     #[serde(rename(deserialize = "@name"))]
     name: Option<String>,
@@ -245,7 +247,7 @@ struct AttachmentMetadata {
     entries: Vec<AttachmentMeta>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct AttachmentMeta {
     #[serde(rename(deserialize = "SchluesselAnhang"))]
     name: Option<String>,
@@ -253,17 +255,18 @@ struct AttachmentMeta {
     value: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Nachricht {
     pub(super) id: String,
     #[serde(flatten)]
     pub(super) details: Details,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Details {
     bereitstellungsdatenart: &'static str,
     bereitstellungsticket: Option<String>,
+    #[schemars(extend("format" = "date"))]
     verfuegbar_bis: Option<String>,
     groesse: u64,
     meta: BTreeMap<String, String>,
@@ -273,21 +276,21 @@ pub(super) struct Details {
     pub(super) anhaenge: Vec<Anhang>,
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, JsonSchema)]
 struct Anschreiben {
     sendername: Option<String>,
     bezeichnung: Option<String>,
     text: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Datenpaket {
     pub(super) objektid: String,
     pub(super) encoding: String,
     pub(super) groesse: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Anhang {
     pub(super) position: usize,
     pub(super) dateiname: Option<String>,

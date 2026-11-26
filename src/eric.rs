@@ -18,6 +18,7 @@ use std::ptr::NonNull;
 use std::time::Instant;
 
 use libloading::{Library, Symbol, os::unix};
+use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::{error::Failure, version};
@@ -33,11 +34,13 @@ const INSTALL_HELP: &str = "Use 'kiecli eric install --accept-eric-terms' or fol
 pub(crate) const LOG_NOTE: &str = "Use --eric-log DIR to keep ERiC diagnostics.";
 pub(crate) const SUPPORTED_MAJORS: &[u16] = &[44];
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(crate) struct LibraryPaths {
     #[serde(serialize_with = "serialize_path")]
+    #[schemars(with = "String")]
     pub(crate) eric: PathBuf,
     #[serde(serialize_with = "serialize_path")]
+    #[schemars(with = "String")]
     pub(crate) otto: PathBuf,
 }
 
@@ -45,21 +48,23 @@ pub(crate) fn serialize_path<S: Serializer>(path: &Path, serializer: S) -> Resul
     serializer.collect_str(&path.display())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(crate) struct TraceEvent {
     pub(crate) call: &'static str,
     pub(crate) duration_ms: u128,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     pub(crate) page: Option<usize>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(crate) struct Probe {
     pub(crate) version: Option<String>,
     pub(crate) supported: Option<bool>,
     pub(crate) terms_accepted: bool,
     pub(crate) library_paths: LibraryPaths,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     pub(crate) trace: Option<Vec<TraceEvent>>,
 }
 

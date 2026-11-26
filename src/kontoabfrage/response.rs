@@ -4,6 +4,7 @@
 use std::io::Write;
 
 use quick_xml::{Reader, events::Event};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use time::{Date, Month, PrimitiveDateTime, format_description::well_known::Iso8601};
 
@@ -14,127 +15,183 @@ use super::Input;
 #[cfg(test)]
 mod tests;
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Reply {
     pub(super) teile: Vec<Teil>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     pub(super) xml: Option<String>,
     #[serde(skip)]
     pub(super) outcome: Result<(), Failure>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
+#[schemars(extend("allOf" = [
+    {
+        "if": {"required": ["antwort_format"], "properties": {"antwort_format": {"const": "alt"}}},
+        "then": {"required": ["steuerarten"]}
+    },
+    {
+        "if": {"required": ["antwort_format"], "properties": {"antwort_format": {"const": "biene"}}},
+        "then": {"required": ["zeilen", "summen"]}
+    },
+    {"dependentRequired": {
+        "steuerarten": ["antwort_format"],
+        "zeilen": ["antwort_format"],
+        "summen": ["antwort_format"]
+    }}
+]))]
 struct Teil {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     steuerart: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "(i32, u16)", description = "Date as [year, ordinal day].")]
     ab: Option<Date>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     ein_jahr: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     jahr: Option<u16>,
     bearbeitungshinweis: Hinweis,
     #[serde(skip_serializing_if = "Option::is_none")]
-    antwort_format: Option<&'static str>,
+    #[schemars(required)]
+    antwort_format: Option<AntwortFormat>,
     #[serde(flatten)]
     alt: Option<Alt>,
     #[serde(flatten)]
     biene: Option<Biene>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+enum AntwortFormat {
+    Alt,
+    Biene,
+}
+
+#[derive(Serialize, JsonSchema)]
 struct Hinweis {
     code: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     text: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Alt {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     abfrage_tagesdatum: Option<String>,
     steuerarten: Vec<AltSteuerart>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     gesamtsumme: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     erlaeuterung: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct AltSteuerart {
     klartext: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     erlaeuterung: Option<String>,
     teilbetraege: Vec<AltTeilbetrag>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     gesamtbetrag: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct AltTeilbetrag {
     zeitraum: Option<String>,
     faelligkeit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     wert: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     erlaeuterung: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Biene {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     stpfl: Option<Stpfl>,
     zeilen: Vec<Zeile>,
     summen: Vec<Summe>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Stpfl {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     finanzamt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     steuernummer: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     abfragedatum: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     kein_leistungsgebot: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Zeile {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     faelligkeit_wertstellung: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     betrag: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     zufluss: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     abfluss: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     offen_forderung: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     offen_verbindlichkeit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     erlaeuterungen: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Summe {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     betrag: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     zufluss: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     abfluss: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     offen_forderung: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     offen_verbindlichkeit: Option<String>,
 }
 
@@ -420,7 +477,13 @@ fn convert_part(part: &WireTeil, expected: &Input) -> Teil {
     };
     let alt = part.alt.as_ref().map(convert_alt);
     let biene = part.biene.as_ref().map(convert_biene);
-    let antwort_format = if alt.is_some() { Some("alt") } else if biene.is_some() { Some("biene") } else { None };
+    let antwort_format = if alt.is_some() {
+        Some(AntwortFormat::Alt)
+    } else if biene.is_some() {
+        Some(AntwortFormat::Biene)
+    } else {
+        None
+    };
     Teil { steuerart, ab, ein_jahr, jahr, bearbeitungshinweis: hinweis, antwort_format, alt, biene }
 }
 
@@ -529,13 +592,22 @@ fn collect_codes(header: &Header, codes: &mut Vec<(i32, Option<String>)>) {
 }
 
 fn mapped_failure(code: i32, text: Option<String>) -> Failure {
+    let exit = super::result_exit(code);
     let failure = match code {
-        950013001 => Failure::new(7, "kontoabfrage_partial", "ELSTER returned a partial Kontoabfrage result"),
-        230077012 | 950017011 => Failure::new(5, "kontoabfrage_authorization_required", "ELSTER did not authorize the Kontoabfrage").note("The Steuerkontoabfrage requires an authorisation, such as a Vollmacht or activation in Mein ELSTER.").help("Activate the Steuerkontoabfrage for this Steuernummer in Mein ELSTER, or ask the Finanzamt how to activate it."),
+        950013001 => Failure::new(exit, "kontoabfrage_partial", "ELSTER returned a partial Kontoabfrage result"),
+        230077012 | 950017011 => Failure::new(exit, "kontoabfrage_authorization_required", "ELSTER did not authorize the Kontoabfrage").note("The Steuerkontoabfrage requires an authorisation, such as a Vollmacht or activation in Mein ELSTER.").help("Activate the Steuerkontoabfrage for this Steuernummer in Mein ELSTER, or ask the Finanzamt how to activate it."),
         130025002 => super::test_certificate_error(),
-        _ => Failure::new(5, "kontoabfrage_rejected", "ELSTER rejected the Kontoabfrage"),
+        950017009 | 950017010 | 950019999 => {
+            Failure::new(exit, "kontoabfrage_rejected", "ELSTER rejected the Kontoabfrage")
+                .help("Contact the Finanzamt about the Kontoabfrage failure.")
+        }
+        _ if exit == 6 => Failure::transient(
+            "kontoabfrage_transient",
+            "ELSTER's Kontoabfrage backend did not return a result",
+        ),
+        _ => Failure::new(exit, "kontoabfrage_rejected", "ELSTER rejected the Kontoabfrage"),
     };
-    if let Some(text) = text { failure.cause("elster", Some(code), Some(text)) } else { failure }
+    failure.cause("elster", Some(code), text)
 }
 
 fn transport_failure(code: i32, text: Option<String>) -> Failure {

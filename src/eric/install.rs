@@ -8,6 +8,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use clap::Args;
+use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use ureq::{Agent, Body, http::StatusCode};
@@ -131,18 +132,21 @@ impl Options {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(crate) struct Installed<'a> {
     version: &'a str,
     #[serde(serialize_with = "serialize_path")]
+    #[schemars(with = "String")]
     eric_dir: PathBuf,
     #[serde(serialize_with = "serialize_path")]
+    #[schemars(with = "String")]
     license: PathBuf,
     data_protection_notice: &'static str,
     test: bool,
     profile: Option<String>,
     warnings: Vec<config::Warning>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     trace: Option<Vec<TraceEvent>>,
 }
 

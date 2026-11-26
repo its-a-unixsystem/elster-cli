@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::rc::Rc;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{AuthenticatedEric, Failure, Operation, Reply, TraceEvent, envelope};
@@ -12,7 +13,7 @@ use super::{AuthenticatedEric, Failure, Operation, Reply, TraceEvent, envelope};
 const BLOCK_SIZE: usize = 100;
 const ERIC_NUTZDATENHEADER_ERROR: i32 = 610101292;
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(super) struct Confirmation {
     pub(super) id: String,
     pub(super) bestaetigt: bool,
@@ -21,6 +22,7 @@ pub(super) struct Confirmation {
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_failure"
     )]
+    #[schemars(with = "Option<Failure>", required)]
     pub(super) fehler: Option<Rc<Failure>>,
     #[serde(skip)]
     rejection: Option<Rc<Failure>>,
@@ -33,7 +35,7 @@ fn serialize_failure<S: serde::Serializer>(
     failure.as_deref().serialize(serializer)
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, JsonSchema)]
 pub(super) struct ConfirmationCode {
     #[serde(rename(deserialize = "Code"))]
     pub(super) code: i32,

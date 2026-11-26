@@ -3,36 +3,43 @@
 
 use std::io::{self, Write};
 
+use schemars::JsonSchema;
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 pub(crate) struct Report<'a> {
     pub(crate) error: &'a Failure,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, JsonSchema)]
 pub(crate) struct Failure {
     #[serde(skip)]
     pub(crate) exit: u8,
     code: &'static str,
     message: Box<str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(min = 1))]
     notes: Vec<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     help: Option<Box<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     suggestion: Option<Box<str>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(min = 1))]
     cause: Vec<Cause>,
     retry: bool,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, JsonSchema)]
 struct Cause {
     source: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     text: Option<String>,
 }
 

@@ -47,3 +47,20 @@ fn maps_header_only_authorization_rejection() {
     assert_eq!(json["code"], "kontoabfrage_authorization_required");
     assert_eq!(json["cause"][0]["code"], 230077012);
 }
+
+#[test]
+fn retries_backend_failures_and_keeps_codes_without_result_text() {
+    for code in [950017008, 950019011] {
+        let xml = format!(
+            "<Elster><TransferHeader><RC><Rueckgabe><Code>{code}</Code></Rueckgabe></RC></TransferHeader></Elster>"
+        );
+        let failure = match read(610101292, &xml, None, "9199026211407", &one_open(), false) {
+            Ok(_) => panic!("expected a retryable backend failure"),
+            Err(failure) => failure,
+        };
+        assert_eq!(failure.exit, 6);
+        let json = serde_json::to_value(failure).unwrap();
+        assert_eq!(json["retry"], true);
+        assert_eq!(json["cause"][0]["code"], code);
+    }
+}

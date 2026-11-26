@@ -3,6 +3,7 @@
 
 mod certificate;
 mod config;
+mod describe;
 mod eric;
 mod error;
 mod pin;
@@ -92,10 +93,19 @@ enum Command {
         #[command(subcommand)]
         command: postfach::Command,
     },
+    /// Query the Taxpayer's tax account.
     Kontoabfrage {
         #[command(subcommand)]
         command: kontoabfrage::Command,
     },
+    /// Describe the CLI and its JSON contracts without loading configuration.
+    Describe {
+        /// Optional command path, such as `postfach abholung`.
+        #[arg(value_name = "COMMAND")]
+        command: Vec<String>,
+    },
+    /// Print the agent skill as Markdown.
+    Skill,
 }
 
 #[derive(Subcommand)]
@@ -118,9 +128,10 @@ enum CertificateCommand {
     Status,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct Status<'a> {
     #[serde(serialize_with = "eric::serialize_path")]
+    #[schemars(with = "String")]
     eric_dir: &'a std::path::Path,
     #[serde(flatten)]
     probe: eric::Probe,
@@ -192,6 +203,10 @@ fn run(cli: &Cli, mut stdout: impl Write) -> Result<(), Failure> {
         } => certificate::status(cli, stdout),
         Command::Postfach { command } => postfach::run(cli, command, stdout),
         Command::Kontoabfrage { command } => kontoabfrage::run(cli, command, stdout),
+        Command::Describe { command } => describe::run(command, cli.verbose, stdout),
+        Command::Skill => stdout
+            .write_all(include_bytes!("../SKILL.md"))
+            .map_err(|err| Failure::new(1, "output_failed", err.to_string())),
     }
 }
 

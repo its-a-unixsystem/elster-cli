@@ -9,6 +9,7 @@ use std::fmt::Write as FmtWrite;
 use std::io::Write;
 
 use clap::{Args, Subcommand};
+use schemars::JsonSchema;
 use serde::Serialize;
 use time::{Date, format_description::well_known::Iso8601};
 
@@ -57,20 +58,48 @@ struct AssessmentOptions {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub(super) enum Steuerart { Alle, Est, Kst, Ust, Lst, Gewst, Zast, Kapest }
+pub(crate) enum Steuerart { Alle, Est, Kst, Ust, Lst, Gewst, Zast, Kapest }
+
+pub(crate) const STEUERARTEN: &[Steuerart] = &[
+    Steuerart::Alle,
+    Steuerart::Est,
+    Steuerart::Kst,
+    Steuerart::Ust,
+    Steuerart::Lst,
+    Steuerart::Gewst,
+    Steuerart::Zast,
+    Steuerart::Kapest,
+];
+
+pub(crate) const DEFAULT_PAYMENT_STEUERART: Steuerart = Steuerart::Alle;
+
+pub(crate) const fn result_exit(code: i32) -> u8 {
+    match code {
+        0 => 0,
+        130025002 => 3,
+        950017008 | 950019011 => 6,
+        950013001 => 7,
+        _ => 5,
+    }
+}
 
 impl Steuerart {
     fn parse(raw: &str) -> Result<Self, Failure> {
-        match raw.to_ascii_lowercase().as_str() {
-            "alle" => Ok(Self::Alle), "est" => Ok(Self::Est), "kst" => Ok(Self::Kst),
-            "ust" => Ok(Self::Ust), "lst" => Ok(Self::Lst), "gewst" => Ok(Self::Gewst),
-            "zast" => Ok(Self::Zast), "kapest" => Ok(Self::Kapest),
-            _ => Err(Failure::new(2, "steuerart_unknown", format!("Unknown Steuerart `{}`", raw.escape_debug()))
-                .help("Use one of alle, ESt, KSt, USt, LSt, GewSt, ZaSt or KapESt.")),
-        }
+        STEUERARTEN
+            .iter()
+            .copied()
+            .find(|kind| raw.eq_ignore_ascii_case(kind.as_str()))
+            .ok_or_else(|| {
+                Failure::new(
+                    2,
+                    "steuerart_unknown",
+                    format!("Unknown Steuerart `{}`", raw.escape_debug()),
+                )
+                .help("Use one of alle, ESt, KSt, USt, LSt, GewSt, ZaSt or KapESt.")
+            })
     }
 
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Alle => "alle", Self::Est => "ESt", Self::Kst => "KSt", Self::Ust => "USt",
             Self::Lst => "LSt", Self::Gewst => "GewSt", Self::Zast => "ZaSt", Self::Kapest => "KapESt",
@@ -92,8 +121,8 @@ impl Input {
     }
 }
 
-#[derive(Serialize)]
-struct Output {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct Output {
     steuernummer: String,
     bundesfinanzamtsnummer: String,
     abfrageart: &'static str,
@@ -103,6 +132,7 @@ struct Output {
     profile: Option<String>,
     warnings: Vec<config::Warning>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     trace: Option<Vec<TraceEvent>>,
 }
 
@@ -190,7 +220,11 @@ fn inputs(command: &Command) -> Result<Vec<Input>, Failure> {
     match command {
         Command::OffeneBetraege => inputs.push(Input::Open),
         Command::Zahlungen(options) => {
-            let kinds = if options.steuerarten.is_empty() { vec![Steuerart::Alle] } else { parse_steuerarten(&options.steuerarten, true)? };
+            let kinds = if options.steuerarten.is_empty() {
+                vec![DEFAULT_PAYMENT_STEUERART]
+            } else {
+                parse_steuerarten(&options.steuerarten, true)?
+            };
             inputs.reserve(kinds.len());
             inputs.extend(kinds.into_iter().map(|steuerart| Input::Payment { steuerart, ab: options.ab, ein_jahr: options.ein_jahr }));
         }

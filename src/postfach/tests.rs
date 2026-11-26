@@ -300,9 +300,9 @@ fn anfrage_merges_pages_in_id_order_and_preserves_metadata() {
         ]
     );
     let json = serde_json::to_value(Output {
-        results: Results::Anfrage {
+        results: Results::Anfrage(Messages {
             postfach_nachrichten: nachrichten,
-        },
+        }),
         test: true,
         profile: None,
         warnings: Vec::new(),

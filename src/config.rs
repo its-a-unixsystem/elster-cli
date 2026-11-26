@@ -8,6 +8,7 @@ use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf, absolute};
 
 use directories::BaseDirs;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use toml::{Table, Value};
 
@@ -69,7 +70,7 @@ pub(crate) struct Settings {
     pub(crate) warnings: Vec<Warning>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, JsonSchema)]
 pub(crate) struct Warning {
     pub(crate) code: &'static str,
     pub(crate) message: &'static str,
@@ -522,7 +523,7 @@ pub(crate) fn show(cli: &Cli, mut out: impl Write) -> Result<(), Failure> {
     .map_err(|err| Failure::new(1, "output_failed", err.to_string()))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct Shown<'a, T> {
     value: Option<T>,
     source: &'a str,
@@ -546,8 +547,8 @@ impl<T: AsRef<str>> Shown<'_, T> {
     }
 }
 
-#[derive(Serialize)]
-struct Show<'a> {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct Show<'a> {
     config: Shown<'a, Cow<'a, str>>,
     eric_dir: Shown<'a, Cow<'a, str>>,
     certificate: Shown<'a, Cow<'a, str>>,
@@ -561,6 +562,7 @@ struct Show<'a> {
     test_source: &'a str,
     warnings: &'a [Warning],
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     trace: Option<&'static [crate::eric::TraceEvent]>,
 }
 

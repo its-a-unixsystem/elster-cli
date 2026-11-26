@@ -4,6 +4,7 @@
 use std::io::{self, Write};
 use std::path::Path;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use time::{Date, Duration, Month, OffsetDateTime, format_description::well_known::Rfc3339};
 
@@ -24,19 +25,21 @@ struct Properties {
     signature: Option<Block>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct Block {
     #[serde(
         rename(deserialize = "AusgestelltAm"),
         deserialize_with = "eric_time",
         serialize_with = "time::serde::rfc3339::serialize"
     )]
+    #[schemars(with = "String", extend("format" = "date-time"))]
     gueltig_ab: OffsetDateTime,
     #[serde(
         rename(deserialize = "GueltigBis"),
         deserialize_with = "eric_time",
         serialize_with = "time::serde::rfc3339::serialize"
     )]
+    #[schemars(with = "String", extend("format" = "date-time"))]
     gueltig_bis: OffsetDateTime,
     #[serde(rename(deserialize = "Signaturalgorithmus"))]
     signaturalgorithmus: Option<String>,
@@ -60,7 +63,8 @@ struct Block {
     testzertifikat: Option<bool>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, JsonSchema)]
+#[schemars(with = "Vec<Name>")]
 struct Names {
     #[serde(rename = "Info", default)]
     entries: Vec<Name>,
@@ -72,7 +76,7 @@ impl Serialize for Names {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 struct Name {
     #[serde(rename(deserialize = "Name"))]
     name: String,
@@ -108,11 +112,13 @@ fn eric_time<'de, D: Deserializer<'de>>(deserializer: D) -> Result<OffsetDateTim
         .map_err(|_| invalid())
 }
 
-#[derive(Serialize)]
-struct Status<'a> {
+#[derive(Serialize, JsonSchema)]
+pub(crate) struct Status<'a> {
     #[serde(with = "time::serde::rfc3339")]
+    #[schemars(with = "String", extend("format" = "date-time"))]
     gueltig_ab: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
+    #[schemars(with = "String", extend("format" = "date-time"))]
     gueltig_bis: OffsetDateTime,
     tage_verbleibend: i64,
     abgelaufen: bool,
@@ -127,6 +133,7 @@ struct Status<'a> {
     profile: Option<String>,
     warnings: Vec<Warning>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(required)]
     trace: Option<Vec<TraceEvent>>,
 }
 

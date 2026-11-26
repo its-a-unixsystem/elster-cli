@@ -12,6 +12,11 @@
 - `postfach anfrage` lists Postfach metadata, including object references and decoded Anschreiben, in ID order across all pages without collecting or confirming Nachrichten.
 - `postfach abholung` writes Datenpakete and Anhänge atomically, reports their hashes and Bestätigung deadlines, and requires an explicit confirmation choice. `postfach bestaetigung` confirms by ID and reports each ELSTER result separately.
 - `kontoabfrage offene-betraege`, `zahlungen` and `sollstellungen` send ERiC Kontoabfragen, convert Bescheid-format Steuernummern, and return legacy or BIENE results as JSON.
+- `describe [command]` reports command arguments, settings, diagnostics, and JSON Schemas. `skill` prints the bundled agent playbook. Both run without configuration, credentials, or ERiC.
+
+### Fixed
+
+- Kontoabfrage now reports retryable ELSTER backend results as exit 6 and preserves the ELSTER code even when there is no result text.
 
 ### Security
 
