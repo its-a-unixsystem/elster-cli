@@ -22,6 +22,7 @@
 
 - Kontoabfrage now reports retryable ELSTER backend results as exit 6 and preserves the ELSTER code even when there is no result text.
 - Fixed Kontoabfrage warnings that blocked the strict CI lint check without changing requests or output.
+- Allow the permissive MIT-0 license in dependency checks for `borrow-or-share`, a transitive test dependency.
 
 ### Security
 
