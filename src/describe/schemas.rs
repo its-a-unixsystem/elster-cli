@@ -21,9 +21,9 @@ pub(super) fn stdout(path: &str) -> Option<Schema> {
         "eric install" => generator.into_root_schema_for::<eric::install::Installed<'_>>(),
         "eric status" => generator.into_root_schema_for::<crate::Status<'_>>(),
         "zertifikat status" => generator.into_root_schema_for::<certificate::Status<'_>>(),
-        "kontoabfrage offene-betraege" | "kontoabfrage zahlungen" | "kontoabfrage sollstellungen" => {
-            generator.into_root_schema_for::<kontoabfrage::Output>()
-        }
+        "kontoabfrage offene-betraege"
+        | "kontoabfrage zahlungen"
+        | "kontoabfrage sollstellungen" => generator.into_root_schema_for::<kontoabfrage::Output>(),
         _ => return postfach::stdout_schema(path.strip_prefix("postfach ")?, generator),
     })
 }

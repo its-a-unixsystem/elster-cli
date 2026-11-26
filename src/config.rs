@@ -54,8 +54,6 @@ pub(crate) struct TaxpayerNumber {
     pub(crate) warnings: Vec<Warning>,
 }
 
-
-
 #[derive(Deserialize)]
 struct CredentialConfig {
     certificate: Option<PathBuf>,
@@ -390,16 +388,26 @@ pub(crate) fn taxpayer_number_settings(cli: &Cli) -> Result<TaxpayerNumber, Fail
         profile.steuernummer.take(),
         "KIECLI_STEUERNUMMER overrides the profile's steuernummer setting",
         &mut layers.warnings,
-    )?.value.ok_or_else(|| Failure::new(2, "steuernummer_missing", "No Steuernummer was supplied")
-        .help("Set --steuernummer, KIECLI_STEUERNUMMER or steuernummer in the selected profile."))?;
+    )?
+    .value
+    .ok_or_else(|| {
+        Failure::new(2, "steuernummer_missing", "No Steuernummer was supplied").help(
+            "Set --steuernummer, KIECLI_STEUERNUMMER or steuernummer in the selected profile.",
+        )
+    })?;
     let bundesland = profile_setting(
         cli.bundesland.clone(),
         || read_env("KIECLI_BUNDESLAND"),
         profile.bundesland.take(),
         "KIECLI_BUNDESLAND overrides the profile's bundesland setting",
         &mut layers.warnings,
-    )?.value;
-    Ok(TaxpayerNumber { steuernummer, bundesland, warnings: layers.warnings })
+    )?
+    .value;
+    Ok(TaxpayerNumber {
+        steuernummer,
+        bundesland,
+        warnings: layers.warnings,
+    })
 }
 
 fn credentials(cli: &Cli, layers: &mut Layers) -> Result<(PathBuf, crate::pin::Pin), Failure> {

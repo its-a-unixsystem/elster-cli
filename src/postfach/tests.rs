@@ -185,10 +185,7 @@ fn sends_one_read_only_status_request_and_filters_the_returned_counts() {
             trace: None,
         },
     );
-    assert_eq!(
-        json["warnings"][0]["code"],
-        "certificate_expires_soon"
-    );
+    assert_eq!(json["warnings"][0]["code"], "certificate_expires_soon");
     assert_eq!(
         json["bereitstellungsdatenarten"],
         serde_json::json!([

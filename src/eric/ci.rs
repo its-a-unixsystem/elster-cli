@@ -145,12 +145,16 @@ fn validates_placeholder_hersteller_id_offline() {
 #[ignore = "requires official ERiC 44; does not contact ELSTER"]
 fn converts_a_bescheid_steuernummer_offline() {
     with_session(|session| {
-        let mut trace = None;
-        let (number, bufa) = session
-            .convert_steuernummer("199/262/11407", "09", None, &mut trace)
-            .unwrap_or_else(fail);
-        assert_eq!(number, "9199026211407");
-        assert_eq!(bufa, "9199");
+        // Steuernummer from the ERiC SDK's ESt_2020.xml example.
+        let (number, bufa) = crate::kontoabfrage::resolve_steuernummer(
+            session,
+            "181/815/08155",
+            Some("BY"),
+            &mut None,
+        )
+        .unwrap_or_else(fail);
+        assert_eq!(number, "9181081508155");
+        assert_eq!(bufa, "9181");
     });
 }
 

@@ -64,7 +64,10 @@ fn describe_lists_offline_and_remote_commands_and_accepts_a_quoted_path() {
                 .any(|command| command["path"] == path && command["stdout_format"] == format)
         );
     }
-    for command in commands.iter().filter(|command| command["stdout_format"] == "json") {
+    for command in commands
+        .iter()
+        .filter(|command| command["stdout_format"] == "json")
+    {
         assert!(command["stdout_schema"].is_object(), "{}", command["path"]);
     }
     let value = describe(&["postfach status"]);
@@ -89,7 +92,10 @@ fn describe_reports_effective_defaults_and_retry_codes() {
         ("postfach anfrage", "neue", "true"),
         ("kontoabfrage zahlungen", "steuerart", "alle"),
     ] {
-        let command = commands.iter().find(|command| command["path"] == path).unwrap();
+        let command = commands
+            .iter()
+            .find(|command| command["path"] == path)
+            .unwrap();
         let arg = command["arguments"]
             .as_array()
             .unwrap()

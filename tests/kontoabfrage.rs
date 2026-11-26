@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
-use std::{env, fs, path::Path, process::{Command, Output}};
+use std::{
+    env, fs,
+    path::Path,
+    process::{Command, Output},
+};
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -29,8 +33,17 @@ fn cli(home: &Path) -> Command {
 }
 
 fn failure(output: Output, exit: i32, code: &str) -> Value {
-    assert_eq!(output.status.code(), Some(exit), "{}", String::from_utf8_lossy(&output.stderr));
-    assert!(output.stdout.is_empty(), "{}", String::from_utf8_lossy(&output.stdout));
+    assert_eq!(
+        output.status.code(),
+        Some(exit),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        output.stdout.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
     let report: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(report["error"]["code"], code, "{report}");
     report["error"].clone()
@@ -39,7 +52,11 @@ fn failure(output: Output, exit: i32, code: &str) -> Value {
 #[test]
 fn requires_a_steuernummer() {
     let home = TempDir::new().unwrap();
-    failure(cli(home.path()).output().unwrap(), 2, "steuernummer_missing");
+    failure(
+        cli(home.path()).output().unwrap(),
+        2,
+        "steuernummer_missing",
+    );
 }
 
 #[test]
@@ -56,7 +73,13 @@ fn requires_bundesland_for_a_bescheid_format_number() {
 fn rejects_an_unknown_bundesland_without_loading_credentials() {
     let home = TempDir::new().unwrap();
     let output = root(home.path())
-        .args(["offene-betraege", "--steuernummer", BESCHEID_STEUERNUMMER, "--bundesland", "XX"])
+        .args([
+            "offene-betraege",
+            "--steuernummer",
+            BESCHEID_STEUERNUMMER,
+            "--bundesland",
+            "XX",
+        ])
         .output()
         .unwrap();
     failure(output, 2, "bundesland_invalid");
@@ -65,7 +88,15 @@ fn rejects_an_unknown_bundesland_without_loading_credentials() {
 fn accepts_case_insensitive_steuerart_values() {
     let home = TempDir::new().unwrap();
     let output = root(home.path())
-        .args(["zahlungen", "--steuernummer", ELSTER_STEUERNUMMER, "--ab", "2026-01-02", "--steuerart", "kApEsT"])
+        .args([
+            "zahlungen",
+            "--steuernummer",
+            ELSTER_STEUERNUMMER,
+            "--ab",
+            "2026-01-02",
+            "--steuerart",
+            "kApEsT",
+        ])
         .output()
         .unwrap();
     let error = failure(output, 3, "certificate_not_found");
@@ -76,7 +107,15 @@ fn accepts_case_insensitive_steuerart_values() {
 fn rejects_invalid_steuerart_values() {
     let home = TempDir::new().unwrap();
     let output = root(home.path())
-        .args(["zahlungen", "--steuernummer", ELSTER_STEUERNUMMER, "--ab", "2026-01-02", "--steuerart", "not-a-tax"])
+        .args([
+            "zahlungen",
+            "--steuernummer",
+            ELSTER_STEUERNUMMER,
+            "--ab",
+            "2026-01-02",
+            "--steuerart",
+            "not-a-tax",
+        ])
         .output()
         .unwrap();
     failure(output, 2, "steuerart_unknown");
@@ -104,7 +143,9 @@ fn rejects_more_than_75_sollstellungen_parts() {
         "--steuerart",
         "KapESt",
     ];
-    let years = (2017..=2027).map(|year| year.to_string()).collect::<Vec<_>>();
+    let years = (2017..=2027)
+        .map(|year| year.to_string())
+        .collect::<Vec<_>>();
     let mut owned_args = args.into_iter().map(str::to_owned).collect::<Vec<_>>();
     for year in &years {
         owned_args.push("--jahr".to_owned());
@@ -162,13 +203,15 @@ fn command_flags_override_profile_taxpayer_settings() {
 fn refuses_the_official_test_certificate_in_live_mode() {
     let home = TempDir::new().unwrap();
     let output = cli(home.path())
-        .args([
-            "--no-test",
-            "--steuernummer",
-            ELSTER_STEUERNUMMER,
-        ])
-        .env("KIECLI_ERIC_DIR", env::var_os("KIECLI_TEST_ERIC_HOME").unwrap())
-        .env("KIECLI_CERTIFICATE", env::var_os("KIECLI_TEST_CERTIFICATE").unwrap())
+        .args(["--no-test", "--steuernummer", ELSTER_STEUERNUMMER])
+        .env(
+            "KIECLI_ERIC_DIR",
+            env::var_os("KIECLI_TEST_ERIC_HOME").unwrap(),
+        )
+        .env(
+            "KIECLI_CERTIFICATE",
+            env::var_os("KIECLI_TEST_CERTIFICATE").unwrap(),
+        )
         .env("KIECLI_PIN", "123456")
         .env("KIECLI_HERSTELLER_ID", "12345")
         .output()

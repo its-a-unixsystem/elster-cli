@@ -6,9 +6,9 @@ mod config;
 mod describe;
 mod eric;
 mod error;
+mod kontoabfrage;
 mod pin;
 mod postfach;
-mod kontoabfrage;
 mod version;
 
 use std::io::{self, Write};

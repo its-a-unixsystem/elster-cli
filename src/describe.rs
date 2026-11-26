@@ -112,7 +112,9 @@ fn effective_defaults<'a>(arg: &'a Arg, path: &str) -> Vec<Cow<'a, str>> {
             vec![Cow::Borrowed("true")]
         }
         ("kontoabfrage zahlungen", "steuerarten") => {
-            vec![Cow::Borrowed(kontoabfrage::DEFAULT_PAYMENT_STEUERART.as_str())]
+            vec![Cow::Borrowed(
+                kontoabfrage::DEFAULT_PAYMENT_STEUERART.as_str(),
+            )]
         }
         _ => arg
             .get_default_values()
