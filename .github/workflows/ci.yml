@@ -12,13 +12,18 @@ on:
         default: false
   schedule:
     - cron: '20 6 * * 1'
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   checks:
-    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted }}
+    if: ${{ inputs.release || ((github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -26,6 +31,20 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check the release tag
+        if: ${{ inputs.release }}
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == "kiecli") | .version')
+          [[ "$GITHUB_REF_NAME" == "v$version" ]] || {
+            echo 'The release tag must match the Cargo package version.' >&2
+            exit 1
+          }
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main || {
+            echo 'The release commit must be on main.' >&2
+            exit 1
+          }
       - name: Check DCO sign-offs
         shell: bash
         env:
@@ -34,7 +53,10 @@ jobs:
           PUSH_BEFORE: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            head=$(git rev-parse HEAD)
+            base=$(git rev-parse --verify --quiet "$head^" || true)
+          elif [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
             base="$PR_BASE"
             head="$PR_HEAD"
           else
@@ -53,13 +75,22 @@ jobs:
           bash .github/scripts/check-dco.sh "$head" "$base"
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
+      - name: List published release tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/kiecli-released-tags"
       - run: cargo test --locked
+        env:
+          KIECLI_TEST_PUBLISHED_TAGS: ${{ runner.temp }}/kiecli-released-tags
       - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
         with:
           arguments: --locked
 
   eric-local:
-    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted }}
+    if: ${{ inputs.release || ((github.event_name == 'push' || github.event_name == 'pull_request') && !github.event.deleted) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -113,7 +144,14 @@ jobs:
           cargo test --locked --bin kiecli eric::ci::elster_test_system_is_reachable -- --ignored --exact
 
   test-system:
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_system)) }}
+    needs: [checks, eric-local]
+    if: >-
+      ${{
+        always() && !cancelled() &&
+        ((inputs.release && needs.checks.result == 'success' && needs.eric-local.result == 'success') ||
+         (!inputs.release && github.ref == 'refs/heads/main' &&
+          (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_system))))
+      }}
     environment: ${{ github.event_name == 'schedule' && 'elster-test-scheduled' || 'elster-test' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

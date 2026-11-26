@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // See NOTICE for the ERiC and Otto additional permission.
 
-use std::{path::Path, process::Command};
+use std::{fs, path::Path, process::Command};
 
 use serde_json::Value;
 
@@ -59,17 +59,36 @@ fn allows_breaking_changes(old: Version, new: Version) -> bool {
     new[0] > old[0] || (old[0] == 0 && new[0] == 0 && new[1] > old[1])
 }
 
+fn latest_release<'a>(reachable: &'a str, published: Option<&str>) -> Option<(Version, &'a str)> {
+    reachable
+        .lines()
+        .filter(|tag| {
+            published.is_none_or(|published| published.lines().any(|released| released == *tag))
+        })
+        .filter_map(|tag| Some((version(tag.strip_prefix('v')?)?, tag)))
+        .max()
+}
+
+#[test]
+fn rejected_tags_cannot_become_the_compatibility_baseline() {
+    let reachable = "v1.0.0\nv1.0.1\nv1.0.2\n";
+    let published = "v1.0.0\nv1.1.0\n"; // 1.1.0 isn't reachable from this release.
+    assert_eq!(
+        latest_release(reachable, Some(published)),
+        Some(([1, 0, 0], "v1.0.0"))
+    );
+}
+
 #[test]
 fn breaking_contract_changes_require_a_version_bump() {
     if !Path::new(env!("CARGO_MANIFEST_DIR")).join(".git").exists() {
         return; // Source packages have no release history.
     }
     let tags = git(&["tag", "--merged", "HEAD", "--list", "v[0-9]*"]);
-    let Some((released, tag)) = tags
-        .lines()
-        .filter_map(|tag| Some((version(tag.strip_prefix('v')?)?, tag)))
-        .max()
-    else {
+    // CI knows which tags were published; an unpublished candidate is not a baseline.
+    let published = std::env::var_os("KIECLI_TEST_PUBLISHED_TAGS")
+        .map(|path| fs::read_to_string(path).expect("read the published release tag list"));
+    let Some((released, tag)) = latest_release(&tags, published.as_deref()) else {
         return; // No release yet.
     };
     let current = version(env!("CARGO_PKG_VERSION")).unwrap();

@@ -4,7 +4,35 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.89"
 license = "AGPL-3.0-only"
-publish = false
+description = "KIECLI is an independent open-source project. It is not affiliated with, endorsed by or supported by ELSTER, the Bayerisches Landesamt für Steuern or any tax authority. ELSTER® is a registered trademark of the Freistaat Bayern."
+repository = "https://github.com/its-a-unixsystem/kiecli"
+documentation = "https://github.com/its-a-unixsystem/kiecli/blob/main/docs/getting-started.md"
+readme = "README.md"
+publish = ["crates-io"]
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/LICENSE",
+    "/NOTICE",
+    "/README.md",
+    "/README.de.md",
+    "/CHANGELOG.md",
+    "/SKILL.md",
+    "/src/**/*.rs",
+    "/schemas/describe.json",
+    "/tests/*.rs",
+    "/tests/fixtures/elster/postfach-anfrage.xml",
+    "/tests/fixtures/elster/postfach-status.xml",
+    "/tests/fixtures/eric/version.xml",
+    "/tests/fixtures/requests/postfach-anfrage.xml",
+    "/tests/fixtures/requests/postfach-bestaetigung.xml",
+    "/tests/fixtures/requests/postfach-status.xml",
+]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
 
 [dependencies]
 base64 = "0.23"

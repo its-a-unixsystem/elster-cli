@@ -14,6 +14,7 @@
 - `kontoabfrage offene-betraege`, `zahlungen` and `sollstellungen` send ERiC Kontoabfragen, convert Bescheid-format Steuernummern, and return legacy or BIENE results as JSON.
 - `describe [command]` reports command arguments, settings, diagnostics, and JSON Schemas. `skill` prints the bundled agent playbook. Both run without configuration, credentials, or ERiC.
 - Check in the initial `describe` and JSON Schema contract. Tests check for snapshot drift, validate fake-driven command output, and enforce the version bump required for breaking changes.
+- Gate tagged releases on CI and the ELSTER test system. Publish an attested Linux x86_64 archive for glibc 2.25 or newer, plus a crates.io source package, and document installation in English and German.
 
 ### Fixed
 

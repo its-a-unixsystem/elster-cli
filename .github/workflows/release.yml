@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: ${{ github.repository == 'its-a-unixsystem/kiecli' && !github.event.deleted }}
+    uses: ./.github/workflows/ci.yml
+    with:
+      release: true
+
+  github-release:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install Zig and cargo-zigbuild
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          install_tool() {
+            local url=$1 sha256=$2 archive=${1##*/}
+            curl --fail --silent --show-error --location "$url" -o "$archive"
+            printf '%s  %s\n' "$sha256" "$archive" | sha256sum --check
+            tar -xJf "$archive"
+            printf '%s/%s\n' "$RUNNER_TEMP" "${archive%.tar.xz}" >> "$GITHUB_PATH"
+          }
+          install_tool \
+            https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz \
+            02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239
+          install_tool \
+            https://github.com/rust-cross/cargo-zigbuild/releases/download/v0.24.1/cargo-zigbuild-x86_64-unknown-linux-musl.tar.xz \
+            f09b180a517af0e4dd4bffc921bb88e5ab705452a9dd948c61e489b3020c68c2
+      - name: Build and package for Linux x86_64
+        id: package
+        shell: bash
+        run: |
+          target=x86_64-unknown-linux-gnu
+          version=${GITHUB_REF_NAME#v}
+          cargo zigbuild --locked --release --target "$target.2.25"
+          binary="target/$target/release/kiecli"
+          bash .github/scripts/check-glibc.sh "$binary"
+          [[ $("$binary" --version) == "kiecli $version" ]]
+          staging=$(mktemp -d)
+          install -m 755 "$binary" "$staging/kiecli"
+          install -m 644 LICENSE NOTICE README.md README.de.md "$staging/"
+          archive="kiecli-$version-$target.tar.gz"
+          tar -czf "$archive" -C "$staging" kiecli LICENSE NOTICE README.md README.de.md
+          sha256sum "$archive" > SHA256SUMS
+          printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+      - name: Attest the archive
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ steps.package.outputs.archive }}
+      - name: Draft and publish the GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        # With assets, gh creates a draft and publishes it only after upload.
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "$ARCHIVE" SHA256SUMS
+
+  crates-io:
+    needs: github-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Authenticate with crates.io
+        if: ${{ vars.CRATES_IO_BOOTSTRAP != 'true' }}
+        id: auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
+      - name: Publish the source package
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ vars.CRATES_IO_BOOTSTRAP == 'true' && secrets.CRATES_IO_BOOTSTRAP_TOKEN || steps.auth.outputs.token }}
+        run: cargo publish --locked
